@@ -32,16 +32,26 @@ class BlenderConnection:
     port: int
     sock: socket.socket = None  # Changed from 'socket' to 'sock' to avoid naming conflict
     
-    def connect(self) -> bool:
-        """Connect to the Blender addon socket server"""
+    def connect(self, timeout: float = 5.0) -> bool:
+        """Connect to the Blender addon socket server
+        
+        Args:
+            timeout: Connection timeout in seconds (default: 5.0)
+        """
         if self.sock:
             return True
             
         try:
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.sock.settimeout(timeout)  # Set connection timeout
             self.sock.connect((self.host, self.port))
+            self.sock.settimeout(None)  # Reset to blocking mode after connection
             logger.info(f"Connected to Blender at {self.host}:{self.port}")
             return True
+        except socket.timeout:
+            logger.error(f"Connection to Blender timed out after {timeout}s")
+            self.sock = None
+            return False
         except Exception as e:
             logger.error(f"Failed to connect to Blender: {str(e)}")
             self.sock = None
@@ -178,20 +188,20 @@ async def server_lifespan(server: FastMCP) -> AsyncIterator[Dict[str, Any]]:
         # Just log that we're starting up
         logger.info("BlenderMCP server starting up")
 
-        # Record startup event for telemetry
-        try:
-            record_startup()
-        except Exception as e:
-            logger.debug(f"Failed to record startup telemetry: {e}")
+        # Record startup event for telemetry in background thread to avoid blocking
+        def _record_telemetry():
+            try:
+                record_startup()
+            except Exception as e:
+                logger.debug(f"Failed to record startup telemetry: {e}")
+        
+        import threading
+        telemetry_thread = threading.Thread(target=_record_telemetry, daemon=True)
+        telemetry_thread.start()
 
-        # Try to connect to Blender on startup to verify it's available
-        try:
-            # This will initialize the global connection if needed
-            blender = get_blender_connection()
-            logger.info("Successfully connected to Blender on startup")
-        except Exception as e:
-            logger.warning(f"Could not connect to Blender on startup: {str(e)}")
-            logger.warning("Make sure the Blender addon is running before using Blender resources or tools")
+        # Don't try to connect to Blender on startup - let it connect lazily on first tool use
+        # This prevents timeout issues with MCP clients like Windsurf
+        logger.info("BlenderMCP server ready (will connect to Blender on first tool use)")
 
         # Return an empty context - we're using the global connection
         yield {}
