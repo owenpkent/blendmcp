@@ -36,6 +36,56 @@ RODIN_FREE_TRIAL_KEY = "k9TcfFoEhNd9cCPP2guHAHHHkctZHIRhZDywZ1euGUXwihbYLpOjQhof
 REQ_HEADERS = requests.utils.default_headers()
 REQ_HEADERS.update({"User-Agent": "blender-mcp"})
 
+
+def _combine_world_bounds(world_corners):
+    """Return (min_xyz, max_xyz) enclosing all given world-space corners.
+
+    world_corners is an iterable of (x, y, z) sequences. Returns None when no
+    corners are supplied. Intentionally free of any Blender dependency so it
+    can be unit tested outside Blender.
+    """
+    min_x = min_y = min_z = float('inf')
+    max_x = max_y = max_z = float('-inf')
+    has_corner = False
+    for corner in world_corners:
+        x, y, z = corner[0], corner[1], corner[2]
+        has_corner = True
+        if x < min_x:
+            min_x = x
+        if y < min_y:
+            min_y = y
+        if z < min_z:
+            min_z = z
+        if x > max_x:
+            max_x = x
+        if y > max_y:
+            max_y = y
+        if z > max_z:
+            max_z = z
+    if not has_corner:
+        return None
+    return (min_x, min_y, min_z), (max_x, max_y, max_z)
+
+
+def _bounds_dimensions(min_xyz, max_xyz):
+    """Return [dx, dy, dz] extents for a (min_xyz, max_xyz) corner pair."""
+    return [
+        max_xyz[0] - min_xyz[0],
+        max_xyz[1] - min_xyz[1],
+        max_xyz[2] - min_xyz[2],
+    ]
+
+
+def _normalization_scale(max_dimension, target_size):
+    """Scale factor that maps max_dimension onto target_size.
+
+    Returns 1.0 when max_dimension is non-positive (nothing to scale).
+    """
+    if max_dimension and max_dimension > 0:
+        return target_size / max_dimension
+    return 1.0
+
+
 class BlenderMCPServer:
     def __init__(self, host='localhost', port=9876):
         self.host = host
@@ -1816,68 +1866,42 @@ class BlenderMCPServer:
                 all_meshes.extend(get_all_mesh_children(obj))
             
             if all_meshes:
-                # Calculate combined world bounding box for all meshes
-                all_min = mathutils.Vector((float('inf'), float('inf'), float('inf')))
-                all_max = mathutils.Vector((float('-inf'), float('-inf'), float('-inf')))
-                
-                for mesh_obj in all_meshes:
-                    # Get world-space bounding box corners
-                    for corner in mesh_obj.bound_box:
-                        world_corner = mesh_obj.matrix_world @ mathutils.Vector(corner)
-                        all_min.x = min(all_min.x, world_corner.x)
-                        all_min.y = min(all_min.y, world_corner.y)
-                        all_min.z = min(all_min.z, world_corner.z)
-                        all_max.x = max(all_max.x, world_corner.x)
-                        all_max.y = max(all_max.y, world_corner.y)
-                        all_max.z = max(all_max.z, world_corner.z)
-                
-                # Calculate dimensions
-                dimensions = [
-                    all_max.x - all_min.x,
-                    all_max.y - all_min.y,
-                    all_max.z - all_min.z
-                ]
+                # Combine the world-space bounding boxes of every mesh, then
+                # optionally scale the root objects so the largest dimension
+                # equals target_size. The geometry math lives in the
+                # module-level _combine_world_bounds / _bounds_dimensions /
+                # _normalization_scale helpers so it can be unit tested
+                # outside Blender.
+                def iter_world_corners():
+                    for mesh_obj in all_meshes:
+                        for corner in mesh_obj.bound_box:
+                            world_corner = mesh_obj.matrix_world @ mathutils.Vector(corner)
+                            yield (world_corner.x, world_corner.y, world_corner.z)
+
+                all_min, all_max = _combine_world_bounds(iter_world_corners())
+                dimensions = _bounds_dimensions(all_min, all_max)
                 max_dimension = max(dimensions)
-                
-                # Apply normalization if requested
+
                 scale_applied = 1.0
                 if normalize_size and max_dimension > 0:
-                    scale_factor = target_size / max_dimension
+                    scale_factor = _normalization_scale(max_dimension, target_size)
                     scale_applied = scale_factor
-                    
-                    # ✅ Only apply scale to ROOT objects (not children!)
-                    # Child objects inherit parent's scale through matrix_world
+
+                    # Only apply scale to ROOT objects; children inherit it
+                    # through their parent's matrix_world.
                     for root in root_objects:
                         root.scale = (
                             root.scale.x * scale_factor,
                             root.scale.y * scale_factor,
                             root.scale.z * scale_factor
                         )
-                    
-                    # Update the scene to recalculate matrix_world for all objects
+
+                    # Recalculate matrix_world for all objects, then re-measure.
                     bpy.context.view_layer.update()
-                    
-                    # Recalculate bounding box after scaling
-                    all_min = mathutils.Vector((float('inf'), float('inf'), float('inf')))
-                    all_max = mathutils.Vector((float('-inf'), float('-inf'), float('-inf')))
-                    
-                    for mesh_obj in all_meshes:
-                        for corner in mesh_obj.bound_box:
-                            world_corner = mesh_obj.matrix_world @ mathutils.Vector(corner)
-                            all_min.x = min(all_min.x, world_corner.x)
-                            all_min.y = min(all_min.y, world_corner.y)
-                            all_min.z = min(all_min.z, world_corner.z)
-                            all_max.x = max(all_max.x, world_corner.x)
-                            all_max.y = max(all_max.y, world_corner.y)
-                            all_max.z = max(all_max.z, world_corner.z)
-                    
-                    dimensions = [
-                        all_max.x - all_min.x,
-                        all_max.y - all_min.y,
-                        all_max.z - all_min.z
-                    ]
-                
-                world_bounding_box = [[all_min.x, all_min.y, all_min.z], [all_max.x, all_max.y, all_max.z]]
+                    all_min, all_max = _combine_world_bounds(iter_world_corners())
+                    dimensions = _bounds_dimensions(all_min, all_max)
+
+                world_bounding_box = [list(all_min), list(all_max)]
             else:
                 world_bounding_box = None
                 dimensions = None

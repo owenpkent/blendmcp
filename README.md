@@ -247,6 +247,24 @@ The system uses a simple JSON-based protocol over TCP sockets:
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
+### Development
+
+Tests live in `tests/` and run outside Blender. Because `addon.py` imports `bpy`
+(only available inside Blender), `tests/conftest.py` installs lightweight
+stand-ins for `bpy`, `mathutils`, and `requests` so the addon's pure helper
+functions can be imported and tested directly.
+
+Install the dev dependencies and run the suite with [uv](https://docs.astral.sh/uv/):
+
+```bash
+uv sync --group dev
+uv run pytest
+```
+
+The current tests cover the geometry helpers used for Sketchfab model
+size normalization (`_combine_world_bounds`, `_bounds_dimensions`,
+`_normalization_scale` in `addon.py`).
+
 ## Disclaimer
 
 This is a third-party integration and not made by Blender. Made by [Siddharth](https://x.com/sidahuj)
