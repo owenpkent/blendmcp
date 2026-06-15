@@ -7,6 +7,11 @@ name: publish
 # trusted publisher for owner "owenpkent", repo "blendmcp", workflow
 # "publish.yml", environment "pypi". See
 # https://docs.pypi.org/trusted-publishers/
+#
+# Caveat: this workflow only runs on release, so the upload-artifact and
+# download-artifact steps are NOT exercised by CI (tests.yml has no artifact
+# steps). Keep those two actions on matching major versions; a mismatch in the
+# artifact hand-off would first surface here, at release time, not in PR checks.
 
 on:
   release:
