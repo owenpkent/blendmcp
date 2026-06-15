@@ -1,7 +1,7 @@
 """Tests for the Sketchfab model size-normalization geometry.
 
 These exercise the pure helpers extracted from
-``MCPBlenderServer.download_sketchfab_model`` in addon.py. They cover the
+``BlendMCPServer.download_sketchfab_model`` in addon.py. They cover the
 combined bounding-box reduction, dimension calculation, and the scale factor
 that maps a model's largest dimension onto a requested target size. The fake
 ``bpy``/``mathutils`` modules in conftest.py let ``addon`` import outside

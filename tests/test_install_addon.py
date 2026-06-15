@@ -71,7 +71,7 @@ def test_install_removes_legacy_addon_copy(tmp_path):
     addons = version_dir / "scripts" / "addons"
     addons.mkdir(parents=True)
     legacy = addons / "addon.py"
-    legacy.write_text('bl_info = {"name": "MCPBlender"}\n', encoding="utf-8")
+    legacy.write_text('bl_info = {"name": "BlendMCP"}\n', encoding="utf-8")
 
     ia.install_into(version_dir, ia.packaged_addon_path())
     # The legacy single-file copy is removed so Blender shows one addon, not two.

@@ -1,5 +1,5 @@
 # Code created by Siddharth Ahuja: www.github.com/ahujasid © 2025
-# MCPBlender is a fork maintained by Owen Kent: github.com/owenpkent/mcpblender
+# BlendMCP is a fork maintained by Owen Kent: github.com/owenpkent/mcpblender
 
 import re
 import bpy
@@ -22,13 +22,13 @@ import os.path as osp
 from contextlib import redirect_stdout, suppress
 
 bl_info = {
-    "name": "MCPBlender",
+    "name": "BlendMCP",
     "author": "Owen Kent",
     # Keep this in lockstep with the package version in pyproject.toml.
     # tests/test_install_addon.py asserts they match.
     "version": (1, 4, 0),
     "blender": (3, 0, 0),
-    "location": "View3D > Sidebar > MCPBlender",
+    "location": "View3D > Sidebar > BlendMCP",
     "description": "Connect Blender to Claude via MCP",
     "category": "Interface",
 }
@@ -89,7 +89,7 @@ def _normalization_scale(max_dimension, target_size):
     return 1.0
 
 
-class MCPBlenderServer:
+class BlendMCPServer:
     def __init__(self, host='localhost', port=9876):
         self.host = host
         self.port = port
@@ -116,7 +116,7 @@ class MCPBlenderServer:
             self.server_thread.daemon = True
             self.server_thread.start()
 
-            print(f"MCPBlender server started on {self.host}:{self.port}")
+            print(f"BlendMCP server started on {self.host}:{self.port}")
         except Exception as e:
             print(f"Failed to start server: {str(e)}")
             self.stop()
@@ -141,7 +141,7 @@ class MCPBlenderServer:
                 pass
             self.server_thread = None
 
-        print("MCPBlender server stopped")
+        print("BlendMCP server stopped")
 
     def _server_loop(self):
         """Main server loop in a separate thread"""
@@ -1363,7 +1363,7 @@ class MCPBlenderServer:
             return {
                 "enabled": False,
                 "message": """PolyHaven integration is currently disabled. To enable it:
-                            1. In the 3D Viewport, find the MCPBlender panel in the sidebar (press N if hidden)
+                            1. In the 3D Viewport, find the BlendMCP panel in the sidebar (press N if hidden)
                             2. Check the 'Use assets from Poly Haven' checkbox
                             3. Restart the connection to Claude"""
         }
@@ -1377,7 +1377,7 @@ class MCPBlenderServer:
                 return {
                     "enabled": False,
                     "message": """Hyper3D Rodin integration is currently enabled, but API key is not given. To enable it:
-                                1. In the 3D Viewport, find the MCPBlender panel in the sidebar (press N if hidden)
+                                1. In the 3D Viewport, find the BlendMCP panel in the sidebar (press N if hidden)
                                 2. Keep the 'Use Hyper3D Rodin 3D model generation' checkbox checked
                                 3. Choose the right plaform and fill in the API Key
                                 4. Restart the connection to Claude"""
@@ -1393,7 +1393,7 @@ class MCPBlenderServer:
             return {
                 "enabled": False,
                 "message": """Hyper3D Rodin integration is currently disabled. To enable it:
-                            1. In the 3D Viewport, find the MCPBlender panel in the sidebar (press N if hidden)
+                            1. In the 3D Viewport, find the BlendMCP panel in the sidebar (press N if hidden)
                             2. Check the 'Use Hyper3D Rodin 3D model generation' checkbox
                             3. Restart the connection to Claude"""
             }
@@ -1752,7 +1752,7 @@ class MCPBlenderServer:
             return {
                 "enabled": False,
                 "message": """Sketchfab integration is currently enabled, but API key is not given. To enable it:
-                            1. In the 3D Viewport, find the MCPBlender panel in the sidebar (press N if hidden)
+                            1. In the 3D Viewport, find the BlendMCP panel in the sidebar (press N if hidden)
                             2. Keep the 'Use Sketchfab' checkbox checked
                             3. Enter your Sketchfab API Key
                             4. Restart the connection to Claude"""
@@ -1761,7 +1761,7 @@ class MCPBlenderServer:
             return {
                 "enabled": False,
                 "message": """Sketchfab integration is currently disabled. To enable it:
-                            1. In the 3D Viewport, find the MCPBlender panel in the sidebar (press N if hidden)
+                            1. In the 3D Viewport, find the BlendMCP panel in the sidebar (press N if hidden)
                             2. Check the 'Use assets from Sketchfab' checkbox
                             3. Enter your Sketchfab API Key
                             4. Restart the connection to Claude"""
@@ -2126,7 +2126,7 @@ class MCPBlenderServer:
                             "enabled": False, 
                             "mode": hunyuan3d_mode, 
                             "message": """Hunyuan3D integration is currently enabled, but SecretId or SecretKey is not given. To enable it:
-                                1. In the 3D Viewport, find the MCPBlender panel in the sidebar (press N if hidden)
+                                1. In the 3D Viewport, find the BlendMCP panel in the sidebar (press N if hidden)
                                 2. Keep the 'Use Tencent Hunyuan 3D model generation' checkbox checked
                                 3. Choose the right platform and fill in the SecretId and SecretKey
                                 4. Restart the connection to Claude"""
@@ -2137,7 +2137,7 @@ class MCPBlenderServer:
                             "enabled": False, 
                             "mode": hunyuan3d_mode, 
                             "message": """Hunyuan3D integration is currently enabled, but API URL  is not given. To enable it:
-                                1. In the 3D Viewport, find the MCPBlender panel in the sidebar (press N if hidden)
+                                1. In the 3D Viewport, find the BlendMCP panel in the sidebar (press N if hidden)
                                 2. Keep the 'Use Tencent Hunyuan 3D model generation' checkbox checked
                                 3. Choose the right platform and fill in the API URL
                                 4. Restart the connection to Claude"""
@@ -2155,7 +2155,7 @@ class MCPBlenderServer:
         return {
             "enabled": False, 
             "message": """Hunyuan3D integration is currently disabled. To enable it:
-                        1. In the 3D Viewport, find the MCPBlender panel in the sidebar (press N if hidden)
+                        1. In the 3D Viewport, find the BlendMCP panel in the sidebar (press N if hidden)
                         2. Check the 'Use Tencent Hunyuan 3D model generation' checkbox
                         3. Restart the connection to Claude"""
         }
@@ -2526,11 +2526,11 @@ class MCPBlenderServer:
 
 # Blender UI Panel
 class BLENDERMCP_PT_Panel(bpy.types.Panel):
-    bl_label = "MCPBlender"
+    bl_label = "BlendMCP"
     bl_idname = "BLENDERMCP_PT_Panel"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
-    bl_category = 'MCPBlender'
+    bl_category = 'BlendMCP'
 
     def draw(self, context):
         layout = self.layout
@@ -2583,14 +2583,14 @@ class BLENDERMCP_OT_SetFreeTrialHyper3DAPIKey(bpy.types.Operator):
 class BLENDERMCP_OT_StartServer(bpy.types.Operator):
     bl_idname = "blendermcp.start_server"
     bl_label = "Connect to Claude"
-    bl_description = "Start the MCPBlender server to connect with Claude"
+    bl_description = "Start the BlendMCP server to connect with Claude"
 
     def execute(self, context):
         scene = context.scene
 
         # Create a new server instance
         if not hasattr(bpy.types, "blendermcp_server") or not bpy.types.blendermcp_server:
-            bpy.types.blendermcp_server = MCPBlenderServer(port=scene.blendermcp_port)
+            bpy.types.blendermcp_server = BlendMCPServer(port=scene.blendermcp_port)
 
         # Start the server
         bpy.types.blendermcp_server.start()
@@ -2620,7 +2620,7 @@ class BLENDERMCP_OT_StopServer(bpy.types.Operator):
 def register():
     bpy.types.Scene.blendermcp_port = IntProperty(
         name="Port",
-        description="Port for the MCPBlender server",
+        description="Port for the BlendMCP server",
         default=9876,
         min=1024,
         max=65535
@@ -2743,7 +2743,7 @@ def register():
     bpy.utils.register_class(BLENDERMCP_OT_StartServer)
     bpy.utils.register_class(BLENDERMCP_OT_StopServer)
 
-    print("MCPBlender addon registered")
+    print("BlendMCP addon registered")
 
 def unregister():
     # Stop the server if it's running
@@ -2774,7 +2774,7 @@ def unregister():
     del bpy.types.Scene.blendermcp_hunyuan3d_guidance_scale
     del bpy.types.Scene.blendermcp_hunyuan3d_texture
 
-    print("MCPBlender addon unregistered")
+    print("BlendMCP addon unregistered")
 
 if __name__ == "__main__":
     register()

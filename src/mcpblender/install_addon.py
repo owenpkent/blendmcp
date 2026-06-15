@@ -1,4 +1,4 @@
-"""Install or update the MCPBlender addon into a local Blender installation.
+"""Install or update the BlendMCP addon into a local Blender installation.
 
 The addon ships inside this package (``mcpblender/addon.py``), so a single
 ``uv tool upgrade blendmcp`` followed by ``blendmcp install-addon`` keeps
@@ -20,7 +20,7 @@ from pathlib import Path
 # single-file addons (Blender derives the module name from the filename).
 INSTALLED_ADDON_NAME = "mcpblender_addon.py"
 # Marker used to recognize a legacy manual install (addon.py) of this addon.
-_ADDON_MARKER = '"name": "MCPBlender"'
+_ADDON_MARKER = '"name": "BlendMCP"'
 
 
 def packaged_addon_path() -> Path:
@@ -95,7 +95,7 @@ def install_into(version_dir: Path, source: Path | None = None) -> Path:
     """Install/overwrite the addon into one Blender version directory.
 
     Removes a legacy ``addon.py`` copy of this addon in the same folder so the
-    user does not end up with two MCPBlender entries. Returns the written path.
+    user does not end up with two BlendMCP entries. Returns the written path.
     """
     source = source or packaged_addon_path()
     target_dir = addons_dir(version_dir)
@@ -137,7 +137,7 @@ def _select_targets(version_dirs: list[Path], requested: str | None, all_version
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="blendmcp install-addon",
-        description="Install or update the MCPBlender Blender addon.",
+        description="Install or update the BlendMCP Blender addon.",
     )
     parser.add_argument(
         "--blender-version",
@@ -199,9 +199,9 @@ def main(argv: list[str] | None = None) -> int:
 
     for version_dir in targets:
         written = install_into(version_dir, source)
-        print(f"Installed MCPBlender addon -> {written}")
+        print(f"Installed BlendMCP addon -> {written}")
     print(
-        "\nEnable it in Blender: Edit > Preferences > Add-ons, search 'MCPBlender', "
+        "\nEnable it in Blender: Edit > Preferences > Add-ons, search 'BlendMCP', "
         "tick the box. If Blender is already open, restart it first."
     )
     return 0

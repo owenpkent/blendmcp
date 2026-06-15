@@ -13,7 +13,7 @@ import pytest
 import mcpblender.server as server
 from mcpblender.server import (
     BlenderConnection,
-    MCPBlenderConfig,
+    BlendMCPConfig,
     _addon_staleness,
     _normalize_rgba,
     _process_bbox,
@@ -85,12 +85,12 @@ def test_process_bbox_rejects_non_positive_floats():
         _process_bbox([0.0, 1.0, 2.0])
 
 
-# --- MCPBlenderConfig.from_env ---
+# --- BlendMCPConfig.from_env ---
 
 def test_config_defaults(monkeypatch):
     monkeypatch.delenv("BLENDER_HOST", raising=False)
     monkeypatch.delenv("BLENDER_PORT", raising=False)
-    cfg = MCPBlenderConfig.from_env()
+    cfg = BlendMCPConfig.from_env()
     assert cfg.host == "localhost"
     assert cfg.port == 9876
 
@@ -98,14 +98,14 @@ def test_config_defaults(monkeypatch):
 def test_config_reads_env(monkeypatch):
     monkeypatch.setenv("BLENDER_HOST", "1.2.3.4")
     monkeypatch.setenv("BLENDER_PORT", "9999")
-    cfg = MCPBlenderConfig.from_env()
+    cfg = BlendMCPConfig.from_env()
     assert cfg.host == "1.2.3.4"
     assert cfg.port == 9999
 
 
 def test_config_malformed_port_falls_back(monkeypatch):
     monkeypatch.setenv("BLENDER_PORT", "not-a-number")
-    cfg = MCPBlenderConfig.from_env()
+    cfg = BlendMCPConfig.from_env()
     assert cfg.port == 9876  # default, not a crash
 
 

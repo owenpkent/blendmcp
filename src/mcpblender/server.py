@@ -17,7 +17,7 @@ from urllib.parse import urlparse
 # Configure logging
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger("MCPBlenderServer")
+logger = logging.getLogger("BlendMCPServer")
 
 # Default configuration
 DEFAULT_HOST = "localhost"
@@ -25,13 +25,13 @@ DEFAULT_PORT = 9876
 
 
 @dataclass
-class MCPBlenderConfig:
+class BlendMCPConfig:
     """Connection configuration, loaded from the environment with safe defaults."""
     host: str = DEFAULT_HOST
     port: int = DEFAULT_PORT
 
     @classmethod
-    def from_env(cls) -> "MCPBlenderConfig":
+    def from_env(cls) -> "BlendMCPConfig":
         cfg = cls()
         cfg.host = os.getenv("BLENDER_HOST", cfg.host)
         raw_port = os.getenv("BLENDER_PORT")
@@ -216,11 +216,11 @@ async def server_lifespan(server: FastMCP) -> AsyncIterator[Dict[str, Any]]:
 
     try:
         # Just log that we're starting up
-        logger.info("MCPBlender server starting up")
+        logger.info("BlendMCP server starting up")
 
         # Don't try to connect to Blender on startup - let it connect lazily on first tool use
         # This prevents timeout issues with MCP clients like Windsurf
-        logger.info("MCPBlender server ready (will connect to Blender on first tool use)")
+        logger.info("BlendMCP server ready (will connect to Blender on first tool use)")
 
         # Return an empty context - we're using the global connection
         yield {}
@@ -231,11 +231,11 @@ async def server_lifespan(server: FastMCP) -> AsyncIterator[Dict[str, Any]]:
             logger.info("Disconnecting from Blender on shutdown")
             _blender_connection.disconnect()
             _blender_connection = None
-        logger.info("MCPBlender server shut down")
+        logger.info("BlendMCP server shut down")
 
 # Create the MCP server with lifespan support
 mcp = FastMCP(
-    "MCPBlender",
+    "BlendMCP",
     lifespan=server_lifespan
 )
 
@@ -268,7 +268,7 @@ def get_blender_connection():
     
     # Create a new connection if needed
     if _blender_connection is None:
-        config = MCPBlenderConfig.from_env()
+        config = BlendMCPConfig.from_env()
         _blender_connection = BlenderConnection(host=config.host, port=config.port)
         if not _blender_connection.connect():
             logger.error("Failed to connect to Blender")
@@ -319,7 +319,7 @@ def get_blender_status(ctx: Context) -> str:
     enabled. Call this first if another tool reports a connection problem; the
     result includes a hint for fixing a failed connection.
     """
-    config = MCPBlenderConfig.from_env()
+    config = BlendMCPConfig.from_env()
     status = {
         "host": config.host,
         "port": config.port,
@@ -365,8 +365,8 @@ def get_blender_status(ctx: Context) -> str:
     except Exception as e:
         status["error"] = str(e)
         status["hint"] = (
-            "Could not reach Blender. Make sure Blender is running, the MCPBlender "
-            "addon is enabled, and you clicked 'Connect to Claude' in the MCPBlender "
+            "Could not reach Blender. Make sure Blender is running, the BlendMCP "
+            "addon is enabled, and you clicked 'Connect to Claude' in the BlendMCP "
             "sidebar (press N in the 3D viewport to show it)."
         )
     return json.dumps(status, indent=2)
@@ -748,7 +748,7 @@ def get_polyhaven_categories(ctx: Context, asset_type: str = "hdris") -> str:
     try:
         blender = get_blender_connection()
         if not _polyhaven_enabled:
-            return "PolyHaven integration is disabled. Select it in the sidebar in MCPBlender, then run it again."
+            return "PolyHaven integration is disabled. Select it in the sidebar in BlendMCP, then run it again."
         result = blender.send_command("get_polyhaven_categories", {"asset_type": asset_type})
         
         if "error" in result:

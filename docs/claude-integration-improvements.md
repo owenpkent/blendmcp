@@ -1,4 +1,4 @@
-# Making MCPBlender work better with Claude
+# Making BlendMCP work better with Claude
 
 This note captures a set of improvements to how Claude drives Blender through the
 MCP server, what shipped on the `improve-claude-integration` branch, and what is
@@ -161,7 +161,7 @@ right calls. What it does that we do not yet:
   with a `from_env()` that type-converts each setting and falls back to the
   default on a malformed value instead of crashing.
 
-  **Implemented.** `MCPBlenderConfig.from_env()` loads `BLENDER_HOST` /
+  **Implemented.** `BlendMCPConfig.from_env()` loads `BLENDER_HOST` /
   `BLENDER_PORT`, logging a warning and keeping the default when the port is
   malformed instead of crashing on `int(...)`.
 
@@ -245,7 +245,7 @@ What the rebrand changed:
 
 - **Rename.** The import package (`blender_mcp` -> `mcpblender`), the CLI command
   and PyPI distribution (`blender-mcp` -> `blendmcp`), and the Blender addon's
-  display name and sidebar tab (`Blender MCP` / `BlenderMCP` -> `MCPBlender`).
+  display name and sidebar tab (`Blender MCP` / `BlenderMCP` -> `BlendMCP`).
   Internal Blender identifiers (`blendermcp_*` scene properties, `BLENDERMCP_*`
   operator classes, `bl_idname`s) were left as-is because they are not
   user-facing and renaming them is untestable churn.
