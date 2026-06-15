@@ -25,6 +25,12 @@ Give feedback, get inspired, and build on top of the MCP: [Discord](https://disc
 ## Release notes (1.4.0)
 - Added Hunyuan3D support
 
+### Recent improvements
+- Structured editing tools: `add_primitive`, `modify_object`, `set_material`, `duplicate_object`, and `delete_object`. These are more reliable than generating raw Python and they return the affected object's bounding box and dimensions so the result is confirmed in one step.
+- `execute_blender_code` now accepts `return_screenshot=True` to return a viewport image alongside the result, so the effect of custom code can be seen without a separate call.
+- Fixed the per-tool telemetry, which previously never recorded due to decorator ordering. Telemetry remains anonymous and opt-out via `DISABLE_TELEMETRY=1`.
+- See `docs/claude-integration-improvements.md` for the rationale and the full list of changes.
+
 
 ### Previously added features:
 - View screenshots for Blender viewport to better understand the scene
@@ -43,9 +49,11 @@ Give feedback, get inspired, and build on top of the MCP: [Discord](https://disc
 ## Features
 
 - **Two-way communication**: Connect Claude AI to Blender through a socket-based server
+- **Structured editing tools**: Add primitives, transform objects, set materials, duplicate, and delete through dedicated tools that return the affected object's bounding box and dimensions for confirmation
 - **Object manipulation**: Create, modify, and delete 3D objects in Blender
 - **Material control**: Apply and modify materials and colors
 - **Scene inspection**: Get detailed information about the current Blender scene
+- **Visual feedback**: Capture viewport screenshots, including alongside `execute_blender_code` results
 - **Code execution**: Run arbitrary Python code in Blender from Claude
 
 ## Components
@@ -194,9 +202,9 @@ Once the config file has been set on Claude, and the addon is running on Blender
 #### Capabilities
 
 - Get scene and object information 
-- Create, delete and modify shapes
+- Add primitives and create, delete, duplicate and modify shapes through dedicated tools that confirm the result
 - Apply or create materials for objects
-- Execute any Python code in Blender
+- Execute any Python code in Blender (optionally returning a viewport screenshot)
 - Download the right models, assets and HDRIs through [Poly Haven](https://polyhaven.com/)
 - AI generated 3D models through [Hyper3D Rodin](https://hyper3d.ai/)
 

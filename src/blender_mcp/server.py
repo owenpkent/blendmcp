@@ -261,8 +261,8 @@ def get_blender_connection():
     return _blender_connection
 
 
-@telemetry_tool("get_scene_info")
 @mcp.tool()
+@telemetry_tool("get_scene_info")
 def get_scene_info(ctx: Context) -> str:
     """Get detailed information about the current Blender scene"""
     try:
@@ -275,8 +275,8 @@ def get_scene_info(ctx: Context) -> str:
         logger.error(f"Error getting scene info from Blender: {str(e)}")
         return f"Error getting scene info: {str(e)}"
 
-@telemetry_tool("get_object_info")
 @mcp.tool()
+@telemetry_tool("get_object_info")
 def get_object_info(ctx: Context, object_name: str) -> str:
     """
     Get detailed information about a specific object in the Blender scene.
@@ -294,70 +294,282 @@ def get_object_info(ctx: Context, object_name: str) -> str:
         logger.error(f"Error getting object info from Blender: {str(e)}")
         return f"Error getting object info: {str(e)}"
 
-@telemetry_tool("get_viewport_screenshot")
+def _capture_viewport_image(blender, max_size: int = 800) -> Image:
+    """Capture the Blender viewport and return it as an MCP Image.
+
+    Shared by get_viewport_screenshot and the optional screenshot returned by
+    execute_blender_code, so the two paths stay in sync.
+    """
+    temp_dir = tempfile.gettempdir()
+    temp_path = os.path.join(temp_dir, f"blender_screenshot_{os.getpid()}.png")
+
+    result = blender.send_command("get_viewport_screenshot", {
+        "max_size": max_size,
+        "filepath": temp_path,
+        "format": "png"
+    })
+
+    if "error" in result:
+        raise Exception(result["error"])
+
+    if not os.path.exists(temp_path):
+        raise Exception("Screenshot file was not created")
+
+    with open(temp_path, 'rb') as f:
+        image_bytes = f.read()
+
+    os.remove(temp_path)
+
+    return Image(data=image_bytes, format="png")
+
+
 @mcp.tool()
+@telemetry_tool("get_viewport_screenshot")
 def get_viewport_screenshot(ctx: Context, max_size: int = 800) -> Image:
     """
     Capture a screenshot of the current Blender 3D viewport.
-    
+
     Parameters:
     - max_size: Maximum size in pixels for the largest dimension (default: 800)
-    
+
     Returns the screenshot as an Image.
     """
     try:
         blender = get_blender_connection()
-        
-        # Create temp file path
-        temp_dir = tempfile.gettempdir()
-        temp_path = os.path.join(temp_dir, f"blender_screenshot_{os.getpid()}.png")
-        
-        result = blender.send_command("get_viewport_screenshot", {
-            "max_size": max_size,
-            "filepath": temp_path,
-            "format": "png"
-        })
-        
-        if "error" in result:
-            raise Exception(result["error"])
-        
-        if not os.path.exists(temp_path):
-            raise Exception("Screenshot file was not created")
-        
-        # Read the file
-        with open(temp_path, 'rb') as f:
-            image_bytes = f.read()
-        
-        # Delete the temp file
-        os.remove(temp_path)
-        
-        return Image(data=image_bytes, format="png")
-        
+        return _capture_viewport_image(blender, max_size=max_size)
     except Exception as e:
         logger.error(f"Error capturing screenshot: {str(e)}")
         raise Exception(f"Screenshot failed: {str(e)}")
 
 
-@telemetry_tool("execute_blender_code")
 @mcp.tool()
-def execute_blender_code(ctx: Context, code: str) -> str:
+@telemetry_tool("execute_blender_code")
+def execute_blender_code(ctx: Context, code: str, return_screenshot: bool = False):
     """
     Execute arbitrary Python code in Blender. Make sure to do it step-by-step by breaking it into smaller chunks.
 
+    For common edits (adding primitives, moving/scaling/rotating objects, assigning
+    a basic color/material, duplicating or deleting objects) prefer the dedicated
+    tools (add_primitive, modify_object, set_material, duplicate_object,
+    delete_object). They are more reliable than generated bpy code and they return
+    the affected object's new bounding box so you can confirm the result. Use this
+    tool for anything those do not cover.
+
     Parameters:
     - code: The Python code to execute
+    - return_screenshot: If True, also capture and return a viewport screenshot so
+      you can visually confirm the effect of the code in the same step.
     """
     try:
         # Get the global connection
         blender = get_blender_connection()
         result = blender.send_command("execute_code", {"code": code})
-        return f"Code executed successfully: {result.get('result', '')}"
+        text = f"Code executed successfully: {result.get('result', '')}"
+
+        if return_screenshot:
+            try:
+                image = _capture_viewport_image(blender)
+                return [text, image]
+            except Exception as shot_error:
+                logger.warning(f"Code ran but screenshot failed: {shot_error}")
+                return f"{text}\n(screenshot unavailable: {shot_error})"
+
+        return text
     except Exception as e:
         logger.error(f"Error executing code: {str(e)}")
         return f"Error executing code: {str(e)}"
 
-@telemetry_tool("get_polyhaven_categories")
+
+def _normalize_rgba(color):
+    """Validate an RGB or RGBA color and pad it to RGBA.
+
+    Components must be floats in the 0..1 range. Returns None when color is None
+    so callers can leave the channel untouched.
+    """
+    if color is None:
+        return None
+    if not isinstance(color, (list, tuple)) or len(color) not in (3, 4):
+        raise ValueError("color must be a list of 3 (RGB) or 4 (RGBA) values in 0..1")
+    rgba = [float(c) for c in color]
+    if any(c < 0.0 or c > 1.0 for c in rgba):
+        raise ValueError("color components must be between 0 and 1")
+    while len(rgba) < 4:
+        rgba.append(1.0)
+    return rgba
+
+
 @mcp.tool()
+@telemetry_tool("add_primitive")
+def add_primitive(
+    ctx: Context,
+    primitive_type: str = "CUBE",
+    name: str = None,
+    location: list[float] = None,
+    rotation: list[float] = None,
+    scale: list[float] = None,
+) -> str:
+    """
+    Add a mesh primitive to the scene. Prefer this over execute_blender_code for
+    basic shapes.
+
+    Parameters:
+    - primitive_type: One of CUBE, SPHERE, CYLINDER, CONE, PLANE, TORUS, CIRCLE, MONKEY
+    - name: Optional name for the new object
+    - location: [x, y, z] world location (default [0, 0, 0])
+    - rotation: [x, y, z] Euler rotation in radians (default [0, 0, 0])
+    - scale: [x, y, z] scale factors (default [1, 1, 1])
+
+    Returns the new object's name, world_bounding_box and dimensions so you can
+    confirm placement and size without a separate query.
+    """
+    try:
+        blender = get_blender_connection()
+        result = blender.send_command("add_primitive", {
+            "primitive_type": primitive_type,
+            "name": name,
+            "location": location or [0, 0, 0],
+            "rotation": rotation or [0, 0, 0],
+            "scale": scale or [1, 1, 1],
+        })
+        return json.dumps(result, indent=2)
+    except Exception as e:
+        logger.error(f"Error adding primitive: {str(e)}")
+        return f"Error adding primitive: {str(e)}"
+
+
+@mcp.tool()
+@telemetry_tool("modify_object")
+def modify_object(
+    ctx: Context,
+    name: str,
+    location: list[float] = None,
+    rotation: list[float] = None,
+    scale: list[float] = None,
+    visible: bool = None,
+) -> str:
+    """
+    Transform an existing object. Only the provided fields are changed.
+
+    Parameters:
+    - name: Name of the object to modify
+    - location: [x, y, z] world location
+    - rotation: [x, y, z] Euler rotation in radians
+    - scale: [x, y, z] scale factors
+    - visible: Show (True) or hide (False) the object
+
+    Returns the object's updated world_bounding_box and dimensions for confirmation.
+    """
+    try:
+        blender = get_blender_connection()
+        params = {"name": name}
+        if location is not None:
+            params["location"] = location
+        if rotation is not None:
+            params["rotation"] = rotation
+        if scale is not None:
+            params["scale"] = scale
+        if visible is not None:
+            params["visible"] = visible
+        result = blender.send_command("modify_object", params)
+        return json.dumps(result, indent=2)
+    except Exception as e:
+        logger.error(f"Error modifying object: {str(e)}")
+        return f"Error modifying object: {str(e)}"
+
+
+@mcp.tool()
+@telemetry_tool("delete_object")
+def delete_object(ctx: Context, name: str) -> str:
+    """
+    Delete an object from the scene by name.
+
+    Parameters:
+    - name: Name of the object to delete
+    """
+    try:
+        blender = get_blender_connection()
+        result = blender.send_command("delete_object", {"name": name})
+        return json.dumps(result, indent=2)
+    except Exception as e:
+        logger.error(f"Error deleting object: {str(e)}")
+        return f"Error deleting object: {str(e)}"
+
+
+@mcp.tool()
+@telemetry_tool("set_material")
+def set_material(
+    ctx: Context,
+    object_name: str,
+    color: list[float] = None,
+    metallic: float = None,
+    roughness: float = None,
+    material_name: str = None,
+) -> str:
+    """
+    Create or update a Principled BSDF material on an object. Prefer this over
+    execute_blender_code for basic colors and material tweaks.
+
+    Parameters:
+    - object_name: Name of the object to apply the material to
+    - color: [r, g, b] or [r, g, b, a] with components in 0..1
+    - metallic: Metallic value in 0..1
+    - roughness: Roughness value in 0..1
+    - material_name: Optional material name (defaults to "<object>_material")
+
+    Returns the object's summary including the assigned material name.
+    """
+    try:
+        rgba = _normalize_rgba(color)
+        blender = get_blender_connection()
+        params = {"object_name": object_name}
+        if rgba is not None:
+            params["color"] = rgba
+        if metallic is not None:
+            params["metallic"] = metallic
+        if roughness is not None:
+            params["roughness"] = roughness
+        if material_name is not None:
+            params["material_name"] = material_name
+        result = blender.send_command("set_material", params)
+        return json.dumps(result, indent=2)
+    except Exception as e:
+        logger.error(f"Error setting material: {str(e)}")
+        return f"Error setting material: {str(e)}"
+
+
+@mcp.tool()
+@telemetry_tool("duplicate_object")
+def duplicate_object(
+    ctx: Context,
+    name: str,
+    new_name: str = None,
+    offset: list[float] = None,
+) -> str:
+    """
+    Duplicate an existing object (including its mesh data). Use this to reuse an
+    asset instead of regenerating or re-downloading it.
+
+    Parameters:
+    - name: Name of the object to duplicate
+    - new_name: Optional name for the copy
+    - offset: [x, y, z] offset added to the copy's location (default [0, 0, 0])
+
+    Returns the new object's summary including world_bounding_box and dimensions.
+    """
+    try:
+        blender = get_blender_connection()
+        result = blender.send_command("duplicate_object", {
+            "name": name,
+            "new_name": new_name,
+            "offset": offset or [0, 0, 0],
+        })
+        return json.dumps(result, indent=2)
+    except Exception as e:
+        logger.error(f"Error duplicating object: {str(e)}")
+        return f"Error duplicating object: {str(e)}"
+
+@mcp.tool()
+@telemetry_tool("get_polyhaven_categories")
 def get_polyhaven_categories(ctx: Context, asset_type: str = "hdris") -> str:
     """
     Get a list of categories for a specific asset type on Polyhaven.
@@ -389,8 +601,8 @@ def get_polyhaven_categories(ctx: Context, asset_type: str = "hdris") -> str:
         logger.error(f"Error getting Polyhaven categories: {str(e)}")
         return f"Error getting Polyhaven categories: {str(e)}"
 
-@telemetry_tool("search_polyhaven_assets")
 @mcp.tool()
+@telemetry_tool("search_polyhaven_assets")
 def search_polyhaven_assets(
     ctx: Context,
     asset_type: str = "all",
@@ -439,8 +651,8 @@ def search_polyhaven_assets(
         logger.error(f"Error searching Polyhaven assets: {str(e)}")
         return f"Error searching Polyhaven assets: {str(e)}"
 
-@telemetry_tool("download_polyhaven_asset")
 @mcp.tool()
+@telemetry_tool("download_polyhaven_asset")
 def download_polyhaven_asset(
     ctx: Context,
     asset_id: str,
@@ -491,8 +703,8 @@ def download_polyhaven_asset(
         logger.error(f"Error downloading Polyhaven asset: {str(e)}")
         return f"Error downloading Polyhaven asset: {str(e)}"
 
-@telemetry_tool("set_texture")
 @mcp.tool()
+@telemetry_tool("set_texture")
 def set_texture(
     ctx: Context,
     object_name: str,
@@ -551,8 +763,8 @@ def set_texture(
         logger.error(f"Error applying texture: {str(e)}")
         return f"Error applying texture: {str(e)}"
 
-@telemetry_tool("get_polyhaven_status")
 @mcp.tool()
+@telemetry_tool("get_polyhaven_status")
 def get_polyhaven_status(ctx: Context) -> str:
     """
     Check if PolyHaven integration is enabled in Blender.
@@ -570,8 +782,8 @@ def get_polyhaven_status(ctx: Context) -> str:
         logger.error(f"Error checking PolyHaven status: {str(e)}")
         return f"Error checking PolyHaven status: {str(e)}"
 
-@telemetry_tool("get_hyper3d_status")
 @mcp.tool()
+@telemetry_tool("get_hyper3d_status")
 def get_hyper3d_status(ctx: Context) -> str:
     """
     Check if Hyper3D Rodin integration is enabled in Blender.
@@ -591,8 +803,8 @@ def get_hyper3d_status(ctx: Context) -> str:
         logger.error(f"Error checking Hyper3D status: {str(e)}")
         return f"Error checking Hyper3D status: {str(e)}"
 
-@telemetry_tool("get_sketchfab_status")
 @mcp.tool()
+@telemetry_tool("get_sketchfab_status")
 def get_sketchfab_status(ctx: Context) -> str:
     """
     Check if Sketchfab integration is enabled in Blender.
@@ -610,8 +822,8 @@ def get_sketchfab_status(ctx: Context) -> str:
         logger.error(f"Error checking Sketchfab status: {str(e)}")
         return f"Error checking Sketchfab status: {str(e)}"
 
-@telemetry_tool("search_sketchfab_models")
 @mcp.tool()
+@telemetry_tool("search_sketchfab_models")
 def search_sketchfab_models(
     ctx: Context,
     query: str,
@@ -687,8 +899,8 @@ def search_sketchfab_models(
         logger.error(traceback.format_exc())
         return f"Error searching Sketchfab models: {str(e)}"
 
-@telemetry_tool("download_sketchfab_model")
 @mcp.tool()
+@telemetry_tool("get_sketchfab_model_preview")
 def get_sketchfab_model_preview(
     ctx: Context,
     uid: str
@@ -731,6 +943,7 @@ def get_sketchfab_model_preview(
 
 
 @mcp.tool()
+@telemetry_tool("download_sketchfab_model")
 def download_sketchfab_model(
     ctx: Context,
     uid: str,
@@ -812,8 +1025,8 @@ def _process_bbox(original_bbox: list[float] | list[int] | None) -> list[int] | 
         raise ValueError("Incorrect number range: bbox must be bigger than zero!")
     return [int(float(i) / max(original_bbox) * 100) for i in original_bbox] if original_bbox else None
 
-@telemetry_tool("generate_hyper3d_model_via_text")
 @mcp.tool()
+@telemetry_tool("generate_hyper3d_model_via_text")
 def generate_hyper3d_model_via_text(
     ctx: Context,
     text_prompt: str,
@@ -849,8 +1062,8 @@ def generate_hyper3d_model_via_text(
         logger.error(f"Error generating Hyper3D task: {str(e)}")
         return f"Error generating Hyper3D task: {str(e)}"
 
-@telemetry_tool("generate_hyper3d_model_via_images")
 @mcp.tool()
+@telemetry_tool("generate_hyper3d_model_via_images")
 def generate_hyper3d_model_via_images(
     ctx: Context,
     input_image_paths: list[str]=None,
@@ -884,7 +1097,7 @@ def generate_hyper3d_model_via_images(
                     (Path(path).suffix, base64.b64encode(f.read()).decode("ascii"))
                 )
     elif input_image_urls is not None:
-        if not all(urlparse(i) for i in input_image_paths):
+        if not all(urlparse(i).scheme and urlparse(i).netloc for i in input_image_urls):
             return "Error: not all image URLs are valid!"
         images = input_image_urls.copy()
     try:
@@ -906,8 +1119,8 @@ def generate_hyper3d_model_via_images(
         logger.error(f"Error generating Hyper3D task: {str(e)}")
         return f"Error generating Hyper3D task: {str(e)}"
 
-@telemetry_tool("poll_rodin_job_status")
 @mcp.tool()
+@telemetry_tool("poll_rodin_job_status")
 def poll_rodin_job_status(
     ctx: Context,
     subscription_key: str=None,
@@ -950,8 +1163,8 @@ def poll_rodin_job_status(
         logger.error(f"Error generating Hyper3D task: {str(e)}")
         return f"Error generating Hyper3D task: {str(e)}"
 
-@telemetry_tool("import_generated_asset")
 @mcp.tool()
+@telemetry_tool("import_generated_asset")
 def import_generated_asset(
     ctx: Context,
     name: str,
@@ -985,6 +1198,7 @@ def import_generated_asset(
         return f"Error generating Hyper3D task: {str(e)}"
 
 @mcp.tool()
+@telemetry_tool("get_hunyuan3d_status")
 def get_hunyuan3d_status(ctx: Context) -> str:
     """
     Check if Hunyuan3D integration is enabled in Blender.
@@ -1002,6 +1216,7 @@ def get_hunyuan3d_status(ctx: Context) -> str:
         return f"Error checking Hunyuan3D status: {str(e)}"
     
 @mcp.tool()
+@telemetry_tool("generate_hunyuan3d_model")
 def generate_hunyuan3d_model(
     ctx: Context,
     text_prompt: str = None,
@@ -1039,6 +1254,7 @@ def generate_hunyuan3d_model(
         return f"Error generating Hunyuan3D task: {str(e)}"
     
 @mcp.tool()
+@telemetry_tool("poll_hunyuan_job_status")
 def poll_hunyuan_job_status(
     ctx: Context,
     job_id: str=None,
@@ -1068,6 +1284,7 @@ def poll_hunyuan_job_status(
         return f"Error generating Hunyuan3D task: {str(e)}"
 
 @mcp.tool()
+@telemetry_tool("import_generated_asset_hunyuan")
 def import_generated_asset_hunyuan(
     ctx: Context,
     name: str,
@@ -1178,12 +1395,24 @@ def asset_creation_strategy() -> str:
         - For environment lighting: Use PolyHaven HDRIs
         - For materials/textures: Use PolyHaven textures
 
-    Only fall back to scripting when:
+    When the library/generator tools do not apply, prefer the dedicated editing
+    tools over execute_blender_code:
+    - add_primitive() for basic shapes (cube, sphere, cylinder, cone, plane, torus)
+    - modify_object() to move, rotate, scale, or hide an object
+    - set_material() for basic colors and material tweaks
+    - duplicate_object() to reuse an asset instead of regenerating it
+    - delete_object() to remove an object
+    These return the affected object's world_bounding_box and dimensions, so you
+    get confirmation of the result without a separate query. They are more reliable
+    than generated bpy code.
+
+    Only fall back to execute_blender_code (raw scripting) when:
     - PolyHaven, Sketchfab, Hyper3D, and Hunyuan3D are all disabled
-    - A simple primitive is explicitly requested
     - No suitable asset exists in any of the libraries
     - Hyper3D Rodin or Hunyuan3D failed to generate the desired asset
-    - The task specifically requires a basic material/color
+    - The operation is not covered by the dedicated editing tools above
+    When you do run raw code and want to see the result, call it with
+    return_screenshot=True to get a viewport image back in the same step.
     """
 
 # Main execution

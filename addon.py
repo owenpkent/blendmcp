@@ -258,6 +258,11 @@ class BlenderMCPServer:
             "get_object_info": self.get_object_info,
             "get_viewport_screenshot": self.get_viewport_screenshot,
             "execute_code": self.execute_code,
+            "add_primitive": self.add_primitive,
+            "modify_object": self.modify_object,
+            "delete_object": self.delete_object,
+            "set_material": self.set_object_material,
+            "duplicate_object": self.duplicate_object,
             "get_telemetry_consent": self.get_telemetry_consent,
             "get_polyhaven_status": self.get_polyhaven_status,
             "get_hyper3d_status": self.get_hyper3d_status,
@@ -485,7 +490,138 @@ class BlenderMCPServer:
         except Exception as e:
             raise Exception(f"Code execution error: {str(e)}")
 
+    def _object_summary(self, obj):
+        """Build a compact, structured summary of an object for confirmation.
 
+        This is the 'scene delta' returned by the structured editing handlers so
+        the caller can confirm the result of an action without a separate query.
+        """
+        summary = {
+            "name": obj.name,
+            "type": obj.type,
+            "location": [round(float(v), 4) for v in obj.location],
+            "rotation": [round(float(v), 4) for v in obj.rotation_euler],
+            "scale": [round(float(v), 4) for v in obj.scale],
+            "visible": obj.visible_get(),
+            "materials": [s.material.name for s in obj.material_slots if s.material],
+        }
+        if obj.type == "MESH":
+            summary["world_bounding_box"] = self._get_aabb(obj)
+            summary["dimensions"] = [round(float(v), 4) for v in obj.dimensions]
+        return summary
+
+    def add_primitive(self, primitive_type="CUBE", name=None,
+                      location=(0, 0, 0), rotation=(0, 0, 0), scale=(1, 1, 1)):
+        """Add a mesh primitive and return its structured summary."""
+        ops = {
+            "CUBE": bpy.ops.mesh.primitive_cube_add,
+            "SPHERE": bpy.ops.mesh.primitive_uv_sphere_add,
+            "CYLINDER": bpy.ops.mesh.primitive_cylinder_add,
+            "CONE": bpy.ops.mesh.primitive_cone_add,
+            "PLANE": bpy.ops.mesh.primitive_plane_add,
+            "TORUS": bpy.ops.mesh.primitive_torus_add,
+            "CIRCLE": bpy.ops.mesh.primitive_circle_add,
+            "MONKEY": bpy.ops.mesh.primitive_monkey_add,
+        }
+        key = (primitive_type or "CUBE").upper()
+        if key not in ops:
+            raise ValueError(
+                f"Unknown primitive type: {primitive_type}. "
+                f"Must be one of: {', '.join(sorted(ops))}"
+            )
+
+        ops[key](location=tuple(location), rotation=tuple(rotation))
+        obj = bpy.context.active_object
+        if name:
+            obj.name = name
+        obj.scale = tuple(scale)
+        bpy.context.view_layer.update()
+        return self._object_summary(obj)
+
+    def modify_object(self, name, location=None, rotation=None,
+                     scale=None, visible=None):
+        """Transform an existing object and return its updated summary."""
+        obj = bpy.data.objects.get(name)
+        if not obj:
+            raise ValueError(f"Object not found: {name}")
+
+        if location is not None:
+            obj.location = tuple(location)
+        if rotation is not None:
+            obj.rotation_euler = tuple(rotation)
+        if scale is not None:
+            obj.scale = tuple(scale)
+        if visible is not None:
+            obj.hide_set(not visible)
+
+        bpy.context.view_layer.update()
+        return self._object_summary(obj)
+
+    def delete_object(self, name):
+        """Delete an object from the scene."""
+        obj = bpy.data.objects.get(name)
+        if not obj:
+            raise ValueError(f"Object not found: {name}")
+        bpy.data.objects.remove(obj, do_unlink=True)
+        return {"deleted": name}
+
+    def set_object_material(self, object_name, color=None, metallic=None,
+                           roughness=None, material_name=None):
+        """Create/assign a Principled BSDF material on an object.
+
+        color is an RGB or RGBA list with components in 0..1.
+        """
+        obj = bpy.data.objects.get(object_name)
+        if not obj:
+            raise ValueError(f"Object not found: {object_name}")
+        if not hasattr(obj.data, "materials"):
+            raise TypeError(f"Object '{object_name}' cannot hold materials")
+
+        mat_name = material_name or f"{object_name}_material"
+        mat = bpy.data.materials.get(mat_name) or bpy.data.materials.new(mat_name)
+        mat.use_nodes = True
+        bsdf = mat.node_tree.nodes.get("Principled BSDF")
+        if bsdf is None:
+            bsdf = mat.node_tree.nodes.new("ShaderNodeBsdfPrincipled")
+
+        if color is not None:
+            rgba = list(color)[:4]
+            while len(rgba) < 4:
+                rgba.append(1.0)
+            bsdf.inputs["Base Color"].default_value = rgba
+        if metallic is not None:
+            bsdf.inputs["Metallic"].default_value = float(metallic)
+        if roughness is not None:
+            bsdf.inputs["Roughness"].default_value = float(roughness)
+
+        if obj.data.materials:
+            obj.data.materials[0] = mat
+        else:
+            obj.data.materials.append(mat)
+
+        summary = self._object_summary(obj)
+        summary["material"] = mat_name
+        return summary
+
+    def duplicate_object(self, name, new_name=None, offset=(0, 0, 0)):
+        """Duplicate an object (with its own mesh data) and return the copy's summary."""
+        obj = bpy.data.objects.get(name)
+        if not obj:
+            raise ValueError(f"Object not found: {name}")
+
+        new_obj = obj.copy()
+        if obj.data:
+            new_obj.data = obj.data.copy()
+        if new_name:
+            new_obj.name = new_name
+        bpy.context.collection.objects.link(new_obj)
+        new_obj.location = (
+            obj.location.x + offset[0],
+            obj.location.y + offset[1],
+            obj.location.z + offset[2],
+        )
+        bpy.context.view_layer.update()
+        return self._object_summary(new_obj)
 
     def get_polyhaven_categories(self, asset_type):
         """Get categories for a specific asset type from Polyhaven"""
