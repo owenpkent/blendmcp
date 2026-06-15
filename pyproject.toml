@@ -1,6 +1,6 @@
 [project]
 name = "blendmcp"
-version = "1.4.0"
+version = "1.4.1"
 description = "Control Blender from Claude and other LLMs through the Model Context Protocol"
 readme = "README.md"
 requires-python = ">=3.10"

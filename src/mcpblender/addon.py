@@ -26,7 +26,7 @@ bl_info = {
     "author": "Owen Kent",
     # Keep this in lockstep with the package version in pyproject.toml.
     # tests/test_install_addon.py asserts they match.
-    "version": (1, 4, 0),
+    "version": (1, 4, 1),
     "blender": (3, 0, 0),
     "location": "View3D > Sidebar > BlendMCP",
     "description": "Connect Blender to Claude via MCP",
