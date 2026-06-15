@@ -28,8 +28,8 @@ build-backend = "setuptools.build_meta"
 package-dir = {"" = "src"}
 
 [project.urls]
-"Homepage" = "https://github.com/owenpkent/mcpblender"
-"Bug Tracker" = "https://github.com/owenpkent/mcpblender/issues"
+"Homepage" = "https://github.com/owenpkent/blendmcp"
+"Bug Tracker" = "https://github.com/owenpkent/blendmcp/issues"
 
 [dependency-groups]
 dev = ["pytest>=8.0"]

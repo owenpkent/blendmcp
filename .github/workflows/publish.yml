@@ -4,7 +4,7 @@ name: publish
 # published. Uses PyPI Trusted Publishing (OIDC), so no API token is stored.
 #
 # One-time setup on PyPI: create the project (or a pending publisher) and add a
-# trusted publisher for owner "owenpkent", repo "mcpblender", workflow
+# trusted publisher for owner "owenpkent", repo "blendmcp", workflow
 # "publish.yml", environment "pypi". See
 # https://docs.pypi.org/trusted-publishers/
 

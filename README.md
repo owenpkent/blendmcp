@@ -7,9 +7,9 @@ Control Blender from Claude and other LLMs through the Model Context Protocol (M
 [![PyPI](https://img.shields.io/pypi/v/blendmcp)](https://pypi.org/project/blendmcp/)
 [![Python](https://img.shields.io/pypi/pyversions/blendmcp)](https://pypi.org/project/blendmcp/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![tests](https://github.com/owenpkent/mcpblender/actions/workflows/tests.yml/badge.svg)](https://github.com/owenpkent/mcpblender/actions/workflows/tests.yml)
+[![tests](https://github.com/owenpkent/blendmcp/actions/workflows/tests.yml/badge.svg)](https://github.com/owenpkent/blendmcp/actions/workflows/tests.yml)
 
-> **Naming:** install it as **`blendmcp`** (`uvx blendmcp` or `pip install blendmcp`). The GitHub repo and the Python import module are `mcpblender`, and the Blender add-on appears as **BlendMCP**. The distribution name differs from the import name because PyPI reserves names too close to the original `blender-mcp` (this is normal, like `pip install pillow` then `import PIL`).
+> **Naming:** the PyPI package, CLI command, GitHub repo, and Blender add-on are all **`blendmcp` / BlendMCP** (`uvx blendmcp`, `pip install blendmcp`). The only exception is the Python import module, which is `mcpblender` (`import mcpblender`). That split exists because PyPI reserves distribution names too close to the original `blender-mcp`; it is normal, like `pip install pillow` then `import PIL`.
 
 This is a telemetry-free fork of [blender-mcp](https://github.com/ahujasid/blender-mcp) by [Siddharth Ahuja](https://x.com/sidahuj). [Original tutorial video](https://www.youtube.com/watch?v=lCyQ717DuzQ) (the setup differs slightly; follow the instructions below).
 

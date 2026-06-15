@@ -233,13 +233,18 @@ What changed:
 Rather than contribute upstream, this became a standalone fork on the maintainer's
 own PyPI and GitHub.
 
-Naming note: the import package and GitHub repo are `mcpblender`, but the **PyPI
-distribution and CLI command are `blendmcp`** (`pip install blendmcp`,
-`uvx blendmcp`). PyPI rejected `mcpblender` as too similar to the existing
-`blender-mcp` / `mcp-blender` projects, so the distribution name differs from the
-import name. This split is normal (compare `pip install pillow` -> `import PIL`).
+Naming note: the **PyPI distribution, CLI command, GitHub repo, and Blender
+add-on are all `blendmcp` / BlendMCP** (`pip install blendmcp`, `uvx blendmcp`).
+The only holdout is the Python import package, which is still `mcpblender`
+(`import mcpblender`). PyPI rejected `mcpblender` as a distribution name (too
+similar to the existing `blender-mcp` / `mcp-blender`), which is why the import
+name differs; this split is normal (compare `pip install pillow` -> `import PIL`).
 The version handshake reads the distribution metadata, so `_server_version()` and
 `__init__.__version__` look up `blendmcp`.
+
+The PyPI Trusted Publisher must point at the current repo name. When the repo was
+renamed `mcpblender` -> `blendmcp`, the publisher's Repository field had to be
+updated to `blendmcp` or releases would stop publishing.
 
 What the rebrand changed:
 

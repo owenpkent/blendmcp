@@ -1,5 +1,5 @@
 # Code created by Siddharth Ahuja: www.github.com/ahujasid © 2025
-# BlendMCP is a fork maintained by Owen Kent: github.com/owenpkent/mcpblender
+# BlendMCP is a fork maintained by Owen Kent: github.com/owenpkent/blendmcp
 
 import re
 import bpy
