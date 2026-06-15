@@ -1,4 +1,4 @@
-"""Unit tests for the MCP tool functions in ``mcpblender.server``.
+"""Unit tests for the MCP tool functions in ``blendmcp.server``.
 
 These exercise each tool's parameter marshalling and result handling against a
 fake Blender connection that records the command it received, so no live Blender
@@ -9,7 +9,7 @@ import json
 
 import pytest
 
-import mcpblender.server as server
+import blendmcp.server as server
 
 
 class _Ctx:

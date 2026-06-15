@@ -9,7 +9,7 @@ Control Blender from Claude and other LLMs through the Model Context Protocol (M
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![tests](https://github.com/owenpkent/blendmcp/actions/workflows/tests.yml/badge.svg)](https://github.com/owenpkent/blendmcp/actions/workflows/tests.yml)
 
-> **Naming:** the PyPI package, CLI command, GitHub repo, and Blender add-on are all **`blendmcp` / BlendMCP** (`uvx blendmcp`, `pip install blendmcp`). The only exception is the Python import module, which is `mcpblender` (`import mcpblender`). That split exists because PyPI reserves distribution names too close to the original `blender-mcp`; it is normal, like `pip install pillow` then `import PIL`.
+> **Naming:** one name throughout. **`blendmcp`** is the PyPI package, the `uvx blendmcp` / `pip install blendmcp` command, the `import blendmcp` module, and the GitHub repo; the Blender add-on appears as **BlendMCP**.
 
 This is a telemetry-free fork of [blender-mcp](https://github.com/ahujasid/blender-mcp) by [Siddharth Ahuja](https://x.com/sidahuj). [Original tutorial video](https://www.youtube.com/watch?v=lCyQ717DuzQ) (the setup differs slightly; follow the instructions below).
 
@@ -56,7 +56,7 @@ Full details and other clients are in [Installation](#installation) below.
   blendmcp install-addon
   ```
   Then restart Blender. `blendmcp install-addon --list` shows detected Blender versions; `--all` installs into every one, and `--blender-version 4.2` targets one.
-- Prefer manual? Download the latest `src/mcpblender/addon.py` and replace the older one in Blender.
+- Prefer manual? Download the latest `src/blendmcp/addon.py` and replace the older one in Blender.
 - If your MCP client caches the server, remove and re-add it (or restart the client) so it picks up the new version.
 - `get_blender_status` reports the server and addon versions and warns when the addon is out of date.
 
@@ -75,8 +75,8 @@ Full details and other clients are in [Installation](#installation) below.
 
 The system consists of two main components:
 
-1. **Blender Addon (`src/mcpblender/addon.py`)**: A Blender addon that creates a socket server within Blender to receive and execute commands
-2. **MCP Server (`src/mcpblender/server.py`)**: A Python server that implements the Model Context Protocol and connects to the Blender addon
+1. **Blender Addon (`src/blendmcp/addon.py`)**: A Blender addon that creates a socket server within Blender to receive and execute commands
+2. **MCP Server (`src/blendmcp/server.py`)**: A Python server that implements the Model Context Protocol and connects to the Blender addon
 
 ## Installation
 
@@ -206,7 +206,7 @@ server, which matters because newer tools require the matching addon.
 
 **Manual install (alternative):**
 
-1. Download `src/mcpblender/addon.py` from this repo
+1. Download `src/blendmcp/addon.py` from this repo
 2. Open Blender
 3. Go to Edit > Preferences > Add-ons
 4. Click "Install..." and select the `addon.py` file

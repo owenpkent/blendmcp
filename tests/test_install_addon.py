@@ -1,6 +1,6 @@
 """Tests for the addon installer helpers and version consistency.
 
-The directory-resolution and selection helpers in ``mcpblender.install_addon``
+The directory-resolution and selection helpers in ``blendmcp.install_addon``
 are pure functions, so they run against temporary directories without Blender.
 A guard test also asserts the addon's ``bl_info`` version matches the package
 version so the two cannot silently drift again.
@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from mcpblender import install_addon as ia
+from blendmcp import install_addon as ia
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -99,7 +99,7 @@ def _version_from_pyproject() -> str:
 
 
 def _version_from_addon() -> str:
-    text = (ROOT / "src" / "mcpblender" / "addon.py").read_text(encoding="utf-8")
+    text = (ROOT / "src" / "blendmcp" / "addon.py").read_text(encoding="utf-8")
     nums = re.search(r'"version":\s*\(([^)]+)\)', text).group(1)
     return ".".join(p.strip() for p in nums.split(","))
 

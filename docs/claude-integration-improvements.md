@@ -5,9 +5,9 @@ MCP server, what shipped on the `improve-claude-integration` branch, and what is
 worth doing next.
 
 > Note: this project was later forked and rebranded from `blender-mcp` to
-> `mcpblender`, and the telemetry described in section 1 was **removed entirely**
+> `blendmcp`, and the telemetry described in section 1 was **removed entirely**
 > in the fork. That section is kept as a record of the original finding; the fork
-> ships no telemetry. See "Forking to mcpblender" at the end.
+> ships no telemetry. See "Forking to blendmcp" at the end.
 
 ## Why these changes
 
@@ -185,7 +185,7 @@ right calls. What it does that we do not yet:
 - **Compile-check tests for generated code.** uemcp unit tests every snippet
   builder by `compile()`-ing the generated source.
 
-  **Not applicable.** mcpblender sends structured commands rather than generated
+  **Not applicable.** blendmcp sends structured commands rather than generated
   Python templates, so there is no snippet source to compile-check. The
   equivalent investment here is the expanded `tests/test_server_helpers.py`
   coverage (config loading, retry/no-retry, traceback surfacing, batch color
@@ -214,7 +214,7 @@ all live in the addon.
 What changed:
 
 - **The addon ships inside the package.** `addon.py` moved to
-  `src/mcpblender/addon.py`, so it is part of the wheel. One source of truth.
+  `src/blendmcp/addon.py`, so it is part of the wheel. One source of truth.
 - **`blendmcp install-addon`** locates the Blender add-ons directory for the
   OS and copies the bundled addon in (`--list`, `--all`, `--blender-version`,
   `--uninstall`). It is a subcommand of the existing entry point, so the no-arg
@@ -228,27 +228,29 @@ What changed:
   telling the user to run `install-addon` when the addon is older than the server
   (or too old to report its version at all).
 
-## Forking to mcpblender / blendmcp
+## Forking to blendmcp
 
 Rather than contribute upstream, this became a standalone fork on the maintainer's
-own PyPI and GitHub.
+own PyPI and GitHub. Everything uses one name: **`blendmcp`** is the PyPI
+distribution, the CLI command (`uvx blendmcp`), the `import blendmcp` module, and
+the GitHub repo (`owenpkent/blendmcp`); the Blender add-on appears as **BlendMCP**.
 
-Naming note: the **PyPI distribution, CLI command, GitHub repo, and Blender
-add-on are all `blendmcp` / BlendMCP** (`pip install blendmcp`, `uvx blendmcp`).
-The only holdout is the Python import package, which is still `mcpblender`
-(`import mcpblender`). PyPI rejected `mcpblender` as a distribution name (too
-similar to the existing `blender-mcp` / `mcp-blender`), which is why the import
-name differs; this split is normal (compare `pip install pillow` -> `import PIL`).
+Two detours along the way are worth recording:
+
+- The project was first rebranded to `mcpblender`, but PyPI rejected that as a
+  *distribution* name (too similar to the existing `blender-mcp` / `mcp-blender`).
+  So it was published as `blendmcp` while the import module stayed `mcpblender`
+  for a release, then the module was renamed to `blendmcp` too.
+- The GitHub repo was renamed `mcpblender` -> `blendmcp`. Because the PyPI Trusted
+  Publisher matches on the current repo name, its Repository field had to be
+  updated to `blendmcp` or releases would stop publishing.
+
 The version handshake reads the distribution metadata, so `_server_version()` and
 `__init__.__version__` look up `blendmcp`.
 
-The PyPI Trusted Publisher must point at the current repo name. When the repo was
-renamed `mcpblender` -> `blendmcp`, the publisher's Repository field had to be
-updated to `blendmcp` or releases would stop publishing.
-
 What the rebrand changed:
 
-- **Rename.** The import package (`blender_mcp` -> `mcpblender`), the CLI command
+- **Rename.** The import package (`blender_mcp` -> `blendmcp`), the CLI command
   and PyPI distribution (`blender-mcp` -> `blendmcp`), and the Blender addon's
   display name and sidebar tab (`Blender MCP` / `BlenderMCP` -> `BlendMCP`).
   Internal Blender identifiers (`blendermcp_*` scene properties, `BLENDERMCP_*`

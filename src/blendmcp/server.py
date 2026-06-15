@@ -1,4 +1,4 @@
-# mcpblender_server.py
+# blendmcp_server.py
 from mcp.server.fastmcp import FastMCP, Context, Image
 import socket
 import json

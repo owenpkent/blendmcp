@@ -1,6 +1,6 @@
 """Install or update the BlendMCP addon into a local Blender installation.
 
-The addon ships inside this package (``mcpblender/addon.py``), so a single
+The addon ships inside this package (``blendmcp/addon.py``), so a single
 ``uv tool upgrade blendmcp`` followed by ``blendmcp install-addon`` keeps
 the MCP server and the Blender addon on the same version. This avoids the manual
 download-and-reinstall step and the server/addon version drift it causes.
@@ -18,14 +18,17 @@ from pathlib import Path
 
 # Name the installed file distinctly so it does not collide with other
 # single-file addons (Blender derives the module name from the filename).
-INSTALLED_ADDON_NAME = "mcpblender_addon.py"
+INSTALLED_ADDON_NAME = "blendmcp_addon.py"
+# Older installed filenames of this addon to clean up on install/uninstall so an
+# upgrade does not leave two copies enabled (1.4.1 shipped "mcpblender_addon.py").
+_LEGACY_ADDON_NAMES = ("mcpblender_addon.py",)
 # Marker used to recognize a legacy manual install (addon.py) of this addon.
 _ADDON_MARKER = '"name": "BlendMCP"'
 
 
 def packaged_addon_path() -> Path:
     """Return the path to the addon.py bundled inside this package."""
-    return Path(str(files("mcpblender") / "addon.py"))
+    return Path(str(files("blendmcp") / "addon.py"))
 
 
 def config_base_dirs() -> list[Path]:
@@ -101,9 +104,15 @@ def install_into(version_dir: Path, source: Path | None = None) -> Path:
     target_dir = addons_dir(version_dir)
     target_dir.mkdir(parents=True, exist_ok=True)
 
+    # Remove a legacy single-file copy (manual addon.py, or an older renamed file)
+    # so the user does not end up with two BlendMCP entries.
     legacy = target_dir / "addon.py"
     if legacy.exists() and _looks_like_our_addon(legacy):
         legacy.unlink()
+    for old_name in _LEGACY_ADDON_NAMES:
+        old = target_dir / old_name
+        if old.exists():
+            old.unlink()
 
     target = target_dir / INSTALLED_ADDON_NAME
     target.write_bytes(source.read_bytes())
@@ -114,9 +123,10 @@ def uninstall_from(version_dir: Path) -> list[Path]:
     """Remove installed copies of the addon from one version directory."""
     target_dir = addons_dir(version_dir)
     removed = []
-    for name in (INSTALLED_ADDON_NAME, "addon.py"):
+    for name in (INSTALLED_ADDON_NAME, *_LEGACY_ADDON_NAMES, "addon.py"):
         candidate = target_dir / name
-        if candidate.exists() and (name == INSTALLED_ADDON_NAME or _looks_like_our_addon(candidate)):
+        is_ours = name != "addon.py" or _looks_like_our_addon(candidate)
+        if candidate.exists() and is_ours:
             candidate.unlink()
             removed.append(candidate)
     return removed

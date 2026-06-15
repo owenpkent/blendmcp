@@ -1,4 +1,4 @@
-"""Tests for the pure helpers and connection behavior in ``mcpblender.server``.
+"""Tests for the pure helpers and connection behavior in ``blendmcp.server``.
 
 These cover color normalization, bounding-box ratio processing, environment
 config loading, the reconnect-once-and-retry logic, and the tool-level handling
@@ -10,8 +10,8 @@ import socket
 
 import pytest
 
-import mcpblender.server as server
-from mcpblender.server import (
+import blendmcp.server as server
+from blendmcp.server import (
     BlenderConnection,
     BlendMCPConfig,
     _addon_staleness,

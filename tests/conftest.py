@@ -1,4 +1,4 @@
-"""Test fixtures for mcpblender.
+"""Test fixtures for blendmcp.
 
 addon.py is a single-file Blender addon that imports ``bpy`` and ``mathutils``
 at module scope, so it cannot normally be imported outside Blender. To unit
@@ -18,7 +18,7 @@ import types
 from unittest.mock import MagicMock
 
 # Make the repo root importable (pytest only puts the tests/ dir on sys.path by
-# default). The addon now ships inside the package as ``mcpblender.addon``.
+# default). The addon now ships inside the package as ``blendmcp.addon``.
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)

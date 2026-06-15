@@ -26,7 +26,7 @@ bl_info = {
     "author": "Owen Kent",
     # Keep this in lockstep with the package version in pyproject.toml.
     # tests/test_install_addon.py asserts they match.
-    "version": (1, 4, 1),
+    "version": (1, 4, 2),
     "blender": (3, 0, 0),
     "location": "View3D > Sidebar > BlendMCP",
     "description": "Connect Blender to Claude via MCP",
@@ -37,7 +37,7 @@ RODIN_FREE_TRIAL_KEY = "k9TcfFoEhNd9cCPP2guHAHHHkctZHIRhZDywZ1euGUXwihbYLpOjQhof
 
 # Add User-Agent as required by Poly Haven API
 REQ_HEADERS = requests.utils.default_headers()
-REQ_HEADERS.update({"User-Agent": "mcpblender"})
+REQ_HEADERS.update({"User-Agent": "blendmcp"})
 
 
 def _combine_world_bounds(world_corners):
