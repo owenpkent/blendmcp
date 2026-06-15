@@ -14,3 +14,6 @@ wheels/
 
 # Local config secrets
 src/mcpblender/config.py
+
+# crash artifacts
+*.stackdump
