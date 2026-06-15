@@ -1,5 +1,5 @@
 [project]
-name = "mcpblender"
+name = "blendmcp"
 version = "1.4.0"
 description = "Control Blender from Claude and other LLMs through the Model Context Protocol"
 readme = "README.md"
@@ -18,7 +18,7 @@ dependencies = [
 ]
 
 [project.scripts]
-mcpblender = "mcpblender.server:main"
+blendmcp = "mcpblender.server:main"
 
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]

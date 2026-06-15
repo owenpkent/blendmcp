@@ -31,7 +31,7 @@ Give feedback, get inspired, and build on top of the MCP: [Discord](https://disc
 - `get_blender_status` reports the connection state and which integrations are enabled. Call it first if a tool reports a connection problem.
 - `execute_blender_code` now accepts `return_screenshot=True` to return a viewport image alongside the result, and surfaces the full Python traceback when the code fails so it can be corrected.
 - The connection reconnects and retries once after a dropped socket, so restarting Blender mid-session no longer breaks the next call.
-- The addon ships inside the package, so `mcpblender install-addon` keeps it on the same version as the server (a version handshake warns when it drifts).
+- The addon ships inside the package, so `blendmcp install-addon` keeps it on the same version as the server (a version handshake warns when it drifts).
 - Removed the telemetry/data-collection code entirely; this fork sends no usage data.
 - See `docs/claude-integration-improvements.md` for the rationale and the full list of changes.
 
@@ -45,12 +45,12 @@ Give feedback, get inspired, and build on top of the MCP: [Discord](https://disc
 
 ### Installing a new version (existing users)
 - For newcomers, you can go straight to Installation. For existing users, see the points below
-- The addon now ships inside the `mcpblender` package, so the server and addon update together. If you installed the server as a uv tool, update both with:
+- The addon now ships inside the `blendmcp` package, so the server and addon update together. If you installed the server as a uv tool, update both with:
   ```bash
-  uv tool upgrade mcpblender
-  mcpblender install-addon
+  uv tool upgrade blendmcp
+  blendmcp install-addon
   ```
-  Then restart Blender. `mcpblender install-addon --list` shows detected Blender versions; `--all` installs into every one, and `--blender-version 4.2` targets one.
+  Then restart Blender. `blendmcp install-addon --list` shows detected Blender versions; `--all` installs into every one, and `--blender-version 4.2` targets one.
 - Prefer manual? Download the latest `src/mcpblender/addon.py` and replace the older one in Blender.
 - If your MCP client caches the server, remove and re-add it (or restart the client) so it picks up the new version.
 - `get_blender_status` reports the server and addon versions and warns when the addon is out of date.
@@ -123,10 +123,10 @@ Go to Claude > Settings > Developer > Edit Config > claude_desktop_config.json t
 ```json
 {
     "mcpServers": {
-        "mcpblender": {
+        "blendmcp": {
             "command": "uvx",
             "args": [
-                "mcpblender"
+                "blendmcp"
             ]
         }
     }
@@ -135,7 +135,7 @@ Go to Claude > Settings > Developer > Edit Config > claude_desktop_config.json t
 
 ### Cursor integration
 
-[![Install MCP Server](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/install-mcp?name=mcpblender&config=eyJjb21tYW5kIjoidXZ4IG1jcGJsZW5kZXIifQ%3D%3D)
+[![Install MCP Server](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/install-mcp?name=blendmcp&config=eyJjb21tYW5kIjoidXZ4IGJsZW5kbWNwIn0%3D)
 
 For Mac users, go to Settings > MCP and paste the following 
 
@@ -146,10 +146,10 @@ For Mac users, go to Settings > MCP and paste the following
 ```json
 {
     "mcpServers": {
-        "mcpblender": {
+        "blendmcp": {
             "command": "uvx",
             "args": [
-                "mcpblender"
+                "blendmcp"
             ]
         }
     }
@@ -161,12 +161,12 @@ For Windows users, go to Settings > MCP > Add Server, add a new server with the 
 ```json
 {
     "mcpServers": {
-        "mcpblender": {
+        "blendmcp": {
             "command": "cmd",
             "args": [
                 "/c",
                 "uvx",
-                "mcpblender"
+                "blendmcp"
             ]
         }
     }
@@ -181,16 +181,16 @@ For Windows users, go to Settings > MCP > Add Server, add a new server with the 
 
 _Prerequisites_: Make sure you have [Visual Studio Code](https://code.visualstudio.com/) installed before proceeding.
 
-[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_mcpblender_server-0098FF?style=flat-square&logo=visualstudiocode&logoColor=ffffff)](vscode:mcp/install?%7B%22name%22%3A%22mcpblender%22%2C%22type%22%3A%22stdio%22%2C%22command%22%3A%22uvx%22%2C%22args%22%3A%5B%22mcpblender%22%5D%7D)
+[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_blendmcp_server-0098FF?style=flat-square&logo=visualstudiocode&logoColor=ffffff)](vscode:mcp/install?%7B%22name%22%3A%22blendmcp%22%2C%22type%22%3A%22stdio%22%2C%22command%22%3A%22uvx%22%2C%22args%22%3A%5B%22blendmcp%22%5D%7D)
 
 ### Installing the Blender Addon
 
-The addon ships inside the `mcpblender` package, so you can install it with one
+The addon ships inside the `blendmcp` package, so you can install it with one
 command instead of downloading a file. After installing the server as a uv tool:
 
 ```bash
-uv tool install mcpblender   # if you have not already
-mcpblender install-addon
+uv tool install blendmcp   # if you have not already
+blendmcp install-addon
 ```
 
 This copies the addon into your Blender add-ons folder (use `--list` to see

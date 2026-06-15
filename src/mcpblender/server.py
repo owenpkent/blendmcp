@@ -280,10 +280,10 @@ def get_blender_connection():
 
 
 def _server_version() -> str:
-    """Return the installed mcpblender package version, or 'unknown'."""
+    """Return the installed blendmcp package version, or 'unknown'."""
     try:
         from importlib.metadata import version
-        return version("mcpblender")
+        return version("blendmcp")
     except Exception:
         return "unknown"
 
@@ -295,7 +295,7 @@ def _addon_staleness(server_version: str, addon_version):
     the addon is too old to report it. A None or older version yields a hint.
     """
     update = (
-        "Update it with: uv tool upgrade mcpblender && mcpblender install-addon"
+        "Update it with: uv tool upgrade blendmcp && blendmcp install-addon"
     )
     if addon_version is None:
         return f"The Blender addon is out of date (it cannot report its version). {update}"

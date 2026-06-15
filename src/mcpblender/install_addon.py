@@ -1,7 +1,7 @@
 """Install or update the MCPBlender addon into a local Blender installation.
 
 The addon ships inside this package (``mcpblender/addon.py``), so a single
-``uv tool upgrade mcpblender`` followed by ``mcpblender install-addon`` keeps
+``uv tool upgrade blendmcp`` followed by ``blendmcp install-addon`` keeps
 the MCP server and the Blender addon on the same version. This avoids the manual
 download-and-reinstall step and the server/addon version drift it causes.
 
@@ -136,7 +136,7 @@ def _select_targets(version_dirs: list[Path], requested: str | None, all_version
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="mcpblender install-addon",
+        prog="blendmcp install-addon",
         description="Install or update the MCPBlender Blender addon.",
     )
     parser.add_argument(
