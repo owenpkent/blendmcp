@@ -1,4 +1,4 @@
-# blender_mcp_server.py
+# mcpblender_server.py
 from mcp.server.fastmcp import FastMCP, Context, Image
 import socket
 import json
@@ -14,14 +14,10 @@ from pathlib import Path
 import base64
 from urllib.parse import urlparse
 
-# Import telemetry
-from .telemetry import record_startup, get_telemetry
-from .telemetry_decorator import telemetry_tool
-
 # Configure logging
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger("BlenderMCPServer")
+logger = logging.getLogger("MCPBlenderServer")
 
 # Default configuration
 DEFAULT_HOST = "localhost"
@@ -29,13 +25,13 @@ DEFAULT_PORT = 9876
 
 
 @dataclass
-class BlenderMCPConfig:
+class MCPBlenderConfig:
     """Connection configuration, loaded from the environment with safe defaults."""
     host: str = DEFAULT_HOST
     port: int = DEFAULT_PORT
 
     @classmethod
-    def from_env(cls) -> "BlenderMCPConfig":
+    def from_env(cls) -> "MCPBlenderConfig":
         cfg = cls()
         cfg.host = os.getenv("BLENDER_HOST", cfg.host)
         raw_port = os.getenv("BLENDER_PORT")
@@ -220,22 +216,11 @@ async def server_lifespan(server: FastMCP) -> AsyncIterator[Dict[str, Any]]:
 
     try:
         # Just log that we're starting up
-        logger.info("BlenderMCP server starting up")
-
-        # Record startup event for telemetry in background thread to avoid blocking
-        def _record_telemetry():
-            try:
-                record_startup()
-            except Exception as e:
-                logger.debug(f"Failed to record startup telemetry: {e}")
-        
-        import threading
-        telemetry_thread = threading.Thread(target=_record_telemetry, daemon=True)
-        telemetry_thread.start()
+        logger.info("MCPBlender server starting up")
 
         # Don't try to connect to Blender on startup - let it connect lazily on first tool use
         # This prevents timeout issues with MCP clients like Windsurf
-        logger.info("BlenderMCP server ready (will connect to Blender on first tool use)")
+        logger.info("MCPBlender server ready (will connect to Blender on first tool use)")
 
         # Return an empty context - we're using the global connection
         yield {}
@@ -246,11 +231,11 @@ async def server_lifespan(server: FastMCP) -> AsyncIterator[Dict[str, Any]]:
             logger.info("Disconnecting from Blender on shutdown")
             _blender_connection.disconnect()
             _blender_connection = None
-        logger.info("BlenderMCP server shut down")
+        logger.info("MCPBlender server shut down")
 
 # Create the MCP server with lifespan support
 mcp = FastMCP(
-    "BlenderMCP",
+    "MCPBlender",
     lifespan=server_lifespan
 )
 
@@ -283,7 +268,7 @@ def get_blender_connection():
     
     # Create a new connection if needed
     if _blender_connection is None:
-        config = BlenderMCPConfig.from_env()
+        config = MCPBlenderConfig.from_env()
         _blender_connection = BlenderConnection(host=config.host, port=config.port)
         if not _blender_connection.connect():
             logger.error("Failed to connect to Blender")
@@ -295,10 +280,10 @@ def get_blender_connection():
 
 
 def _server_version() -> str:
-    """Return the installed blender-mcp package version, or 'unknown'."""
+    """Return the installed mcpblender package version, or 'unknown'."""
     try:
         from importlib.metadata import version
-        return version("blender-mcp")
+        return version("mcpblender")
     except Exception:
         return "unknown"
 
@@ -310,7 +295,7 @@ def _addon_staleness(server_version: str, addon_version):
     the addon is too old to report it. A None or older version yields a hint.
     """
     update = (
-        "Update it with: uv tool upgrade blender-mcp && blender-mcp install-addon"
+        "Update it with: uv tool upgrade mcpblender && mcpblender install-addon"
     )
     if addon_version is None:
         return f"The Blender addon is out of date (it cannot report its version). {update}"
@@ -328,14 +313,13 @@ def _addon_staleness(server_version: str, addon_version):
 
 
 @mcp.tool()
-@telemetry_tool("get_blender_status")
 def get_blender_status(ctx: Context) -> str:
     """
     Report whether the MCP server can reach Blender and which integrations are
     enabled. Call this first if another tool reports a connection problem; the
     result includes a hint for fixing a failed connection.
     """
-    config = BlenderMCPConfig.from_env()
+    config = MCPBlenderConfig.from_env()
     status = {
         "host": config.host,
         "port": config.port,
@@ -381,15 +365,14 @@ def get_blender_status(ctx: Context) -> str:
     except Exception as e:
         status["error"] = str(e)
         status["hint"] = (
-            "Could not reach Blender. Make sure Blender is running, the BlenderMCP "
-            "addon is enabled, and you clicked 'Connect to Claude' in the BlenderMCP "
+            "Could not reach Blender. Make sure Blender is running, the MCPBlender "
+            "addon is enabled, and you clicked 'Connect to Claude' in the MCPBlender "
             "sidebar (press N in the 3D viewport to show it)."
         )
     return json.dumps(status, indent=2)
 
 
 @mcp.tool()
-@telemetry_tool("get_scene_info")
 def get_scene_info(ctx: Context) -> str:
     """Get detailed information about the current Blender scene"""
     try:
@@ -403,7 +386,6 @@ def get_scene_info(ctx: Context) -> str:
         return f"Error getting scene info: {str(e)}"
 
 @mcp.tool()
-@telemetry_tool("get_object_info")
 def get_object_info(ctx: Context, object_name: str) -> str:
     """
     Get detailed information about a specific object in the Blender scene.
@@ -469,7 +451,6 @@ def _capture_viewport_image(blender, max_size: int = 800) -> Image:
 
 
 @mcp.tool()
-@telemetry_tool("get_viewport_screenshot")
 def get_viewport_screenshot(ctx: Context, max_size: int = 800) -> Image:
     """
     Capture a screenshot of the current Blender 3D viewport.
@@ -488,7 +469,6 @@ def get_viewport_screenshot(ctx: Context, max_size: int = 800) -> Image:
 
 
 @mcp.tool()
-@telemetry_tool("execute_blender_code")
 def execute_blender_code(ctx: Context, code: str, return_screenshot: bool = False):
     """
     Execute arbitrary Python code in Blender. Make sure to do it step-by-step by breaking it into smaller chunks.
@@ -558,7 +538,6 @@ def _normalize_rgba(color):
 
 
 @mcp.tool()
-@telemetry_tool("add_primitive")
 def add_primitive(
     ctx: Context,
     primitive_type: str = "CUBE",
@@ -597,7 +576,6 @@ def add_primitive(
 
 
 @mcp.tool()
-@telemetry_tool("modify_object")
 def modify_object(
     ctx: Context,
     name: str,
@@ -637,7 +615,6 @@ def modify_object(
 
 
 @mcp.tool()
-@telemetry_tool("delete_object")
 def delete_object(ctx: Context, name: str) -> str:
     """
     Delete an object from the scene by name.
@@ -655,7 +632,6 @@ def delete_object(ctx: Context, name: str) -> str:
 
 
 @mcp.tool()
-@telemetry_tool("set_material")
 def set_material(
     ctx: Context,
     object_name: str,
@@ -697,7 +673,6 @@ def set_material(
 
 
 @mcp.tool()
-@telemetry_tool("duplicate_object")
 def duplicate_object(
     ctx: Context,
     name: str,
@@ -729,7 +704,6 @@ def duplicate_object(
 
 
 @mcp.tool()
-@telemetry_tool("batch_edit")
 def batch_edit(ctx: Context, operations: list[dict]) -> str:
     """
     Apply several editing operations in a single round trip. Use this for bulk
@@ -764,7 +738,6 @@ def batch_edit(ctx: Context, operations: list[dict]) -> str:
 
 
 @mcp.tool()
-@telemetry_tool("get_polyhaven_categories")
 def get_polyhaven_categories(ctx: Context, asset_type: str = "hdris") -> str:
     """
     Get a list of categories for a specific asset type on Polyhaven.
@@ -775,7 +748,7 @@ def get_polyhaven_categories(ctx: Context, asset_type: str = "hdris") -> str:
     try:
         blender = get_blender_connection()
         if not _polyhaven_enabled:
-            return "PolyHaven integration is disabled. Select it in the sidebar in BlenderMCP, then run it again."
+            return "PolyHaven integration is disabled. Select it in the sidebar in MCPBlender, then run it again."
         result = blender.send_command("get_polyhaven_categories", {"asset_type": asset_type})
         
         if "error" in result:
@@ -797,7 +770,6 @@ def get_polyhaven_categories(ctx: Context, asset_type: str = "hdris") -> str:
         return f"Error getting Polyhaven categories: {str(e)}"
 
 @mcp.tool()
-@telemetry_tool("search_polyhaven_assets")
 def search_polyhaven_assets(
     ctx: Context,
     asset_type: str = "all",
@@ -847,7 +819,6 @@ def search_polyhaven_assets(
         return f"Error searching Polyhaven assets: {str(e)}"
 
 @mcp.tool()
-@telemetry_tool("download_polyhaven_asset")
 def download_polyhaven_asset(
     ctx: Context,
     asset_id: str,
@@ -899,7 +870,6 @@ def download_polyhaven_asset(
         return f"Error downloading Polyhaven asset: {str(e)}"
 
 @mcp.tool()
-@telemetry_tool("set_texture")
 def set_texture(
     ctx: Context,
     object_name: str,
@@ -959,7 +929,6 @@ def set_texture(
         return f"Error applying texture: {str(e)}"
 
 @mcp.tool()
-@telemetry_tool("get_polyhaven_status")
 def get_polyhaven_status(ctx: Context) -> str:
     """
     Check if PolyHaven integration is enabled in Blender.
@@ -978,7 +947,6 @@ def get_polyhaven_status(ctx: Context) -> str:
         return f"Error checking PolyHaven status: {str(e)}"
 
 @mcp.tool()
-@telemetry_tool("get_hyper3d_status")
 def get_hyper3d_status(ctx: Context) -> str:
     """
     Check if Hyper3D Rodin integration is enabled in Blender.
@@ -999,7 +967,6 @@ def get_hyper3d_status(ctx: Context) -> str:
         return f"Error checking Hyper3D status: {str(e)}"
 
 @mcp.tool()
-@telemetry_tool("get_sketchfab_status")
 def get_sketchfab_status(ctx: Context) -> str:
     """
     Check if Sketchfab integration is enabled in Blender.
@@ -1018,7 +985,6 @@ def get_sketchfab_status(ctx: Context) -> str:
         return f"Error checking Sketchfab status: {str(e)}"
 
 @mcp.tool()
-@telemetry_tool("search_sketchfab_models")
 def search_sketchfab_models(
     ctx: Context,
     query: str,
@@ -1095,7 +1061,6 @@ def search_sketchfab_models(
         return f"Error searching Sketchfab models: {str(e)}"
 
 @mcp.tool()
-@telemetry_tool("get_sketchfab_model_preview")
 def get_sketchfab_model_preview(
     ctx: Context,
     uid: str
@@ -1138,7 +1103,6 @@ def get_sketchfab_model_preview(
 
 
 @mcp.tool()
-@telemetry_tool("download_sketchfab_model")
 def download_sketchfab_model(
     ctx: Context,
     uid: str,
@@ -1221,7 +1185,6 @@ def _process_bbox(original_bbox: list[float] | list[int] | None) -> list[int] | 
     return [int(float(i) / max(original_bbox) * 100) for i in original_bbox] if original_bbox else None
 
 @mcp.tool()
-@telemetry_tool("generate_hyper3d_model_via_text")
 def generate_hyper3d_model_via_text(
     ctx: Context,
     text_prompt: str,
@@ -1258,7 +1221,6 @@ def generate_hyper3d_model_via_text(
         return f"Error generating Hyper3D task: {str(e)}"
 
 @mcp.tool()
-@telemetry_tool("generate_hyper3d_model_via_images")
 def generate_hyper3d_model_via_images(
     ctx: Context,
     input_image_paths: list[str]=None,
@@ -1315,7 +1277,6 @@ def generate_hyper3d_model_via_images(
         return f"Error generating Hyper3D task: {str(e)}"
 
 @mcp.tool()
-@telemetry_tool("poll_rodin_job_status")
 def poll_rodin_job_status(
     ctx: Context,
     subscription_key: str=None,
@@ -1359,7 +1320,6 @@ def poll_rodin_job_status(
         return f"Error generating Hyper3D task: {str(e)}"
 
 @mcp.tool()
-@telemetry_tool("import_generated_asset")
 def import_generated_asset(
     ctx: Context,
     name: str,
@@ -1393,7 +1353,6 @@ def import_generated_asset(
         return f"Error generating Hyper3D task: {str(e)}"
 
 @mcp.tool()
-@telemetry_tool("get_hunyuan3d_status")
 def get_hunyuan3d_status(ctx: Context) -> str:
     """
     Check if Hunyuan3D integration is enabled in Blender.
@@ -1411,7 +1370,6 @@ def get_hunyuan3d_status(ctx: Context) -> str:
         return f"Error checking Hunyuan3D status: {str(e)}"
     
 @mcp.tool()
-@telemetry_tool("generate_hunyuan3d_model")
 def generate_hunyuan3d_model(
     ctx: Context,
     text_prompt: str = None,
@@ -1449,7 +1407,6 @@ def generate_hunyuan3d_model(
         return f"Error generating Hunyuan3D task: {str(e)}"
     
 @mcp.tool()
-@telemetry_tool("poll_hunyuan_job_status")
 def poll_hunyuan_job_status(
     ctx: Context,
     job_id: str=None,
@@ -1479,7 +1436,6 @@ def poll_hunyuan_job_status(
         return f"Error generating Hunyuan3D task: {str(e)}"
 
 @mcp.tool()
-@telemetry_tool("import_generated_asset_hunyuan")
 def import_generated_asset_hunyuan(
     ctx: Context,
     name: str,

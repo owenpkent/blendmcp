@@ -1,11 +1,11 @@
 [project]
-name = "blender-mcp"
+name = "mcpblender"
 version = "1.4.0"
-description = "Blender integration through the Model Context Protocol"
+description = "Control Blender from Claude and other LLMs through the Model Context Protocol"
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [
-    {name = "Siddharth Ahuja"}
+    {name = "Owen Kent", email = "Owenpkent@gmail.com"}
 ]
 license = {text = "MIT"}
 classifiers = [
@@ -15,12 +15,10 @@ classifiers = [
 ]
 dependencies = [
     "mcp[cli]>=1.3.0",
-    "supabase>=2.0.0",
-    "tomli>=2.0.0",
 ]
 
 [project.scripts]
-blender-mcp = "blender_mcp.server:main"
+mcpblender = "mcpblender.server:main"
 
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
@@ -30,8 +28,8 @@ build-backend = "setuptools.build_meta"
 package-dir = {"" = "src"}
 
 [project.urls]
-"Homepage" = "https://github.com/ahujasid/blender-mcp"
-"Bug Tracker" = "https://github.com/ahujasid/blender-mcp/issues"
+"Homepage" = "https://github.com/owenpkent/mcpblender"
+"Bug Tracker" = "https://github.com/owenpkent/mcpblender/issues"
 
 [dependency-groups]
 dev = ["pytest>=8.0"]

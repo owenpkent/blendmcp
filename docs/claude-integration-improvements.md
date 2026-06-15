@@ -1,8 +1,13 @@
-# Making BlenderMCP work better with Claude
+# Making MCPBlender work better with Claude
 
 This note captures a set of improvements to how Claude drives Blender through the
 MCP server, what shipped on the `improve-claude-integration` branch, and what is
 worth doing next.
+
+> Note: this project was later forked and rebranded from `blender-mcp` to
+> `mcpblender`, and the telemetry described in section 1 was **removed entirely**
+> in the fork. That section is kept as a record of the original finding; the fork
+> ships no telemetry. See "Forking to mcpblender" at the end.
 
 ## Why these changes
 
@@ -156,7 +161,7 @@ right calls. What it does that we do not yet:
   with a `from_env()` that type-converts each setting and falls back to the
   default on a malformed value instead of crashing.
 
-  **Implemented.** `BlenderMCPConfig.from_env()` loads `BLENDER_HOST` /
+  **Implemented.** `MCPBlenderConfig.from_env()` loads `BLENDER_HOST` /
   `BLENDER_PORT`, logging a warning and keeping the default when the port is
   malformed instead of crashing on `int(...)`.
 
@@ -180,7 +185,7 @@ right calls. What it does that we do not yet:
 - **Compile-check tests for generated code.** uemcp unit tests every snippet
   builder by `compile()`-ing the generated source.
 
-  **Not applicable.** blender-mcp sends structured commands rather than generated
+  **Not applicable.** mcpblender sends structured commands rather than generated
   Python templates, so there is no snippet source to compile-check. The
   equivalent investment here is the expanded `tests/test_server_helpers.py`
   coverage (config loading, retry/no-retry, traceback surfacing, batch color
@@ -198,7 +203,7 @@ checkpoints before `execute_blender_code`.
 
 ## Easy install and update
 
-The server was already on PyPI (`uvx blender-mcp`), but the addon was not: it
+The server was already on PyPI (`uvx mcpblender`), but the addon was not: it
 lived at the repo root, was installed by hand, and updated by re-downloading the
 file. Nothing tied its version to the server's, and in fact the addon
 (`bl_info` 1.2), the package (`pyproject` 1.4.0), and `__init__.__version__`
@@ -209,12 +214,12 @@ all live in the addon.
 What changed:
 
 - **The addon ships inside the package.** `addon.py` moved to
-  `src/blender_mcp/addon.py`, so it is part of the wheel. One source of truth.
-- **`blender-mcp install-addon`** locates the Blender add-ons directory for the
+  `src/mcpblender/addon.py`, so it is part of the wheel. One source of truth.
+- **`mcpblender install-addon`** locates the Blender add-ons directory for the
   OS and copies the bundled addon in (`--list`, `--all`, `--blender-version`,
   `--uninstall`). It is a subcommand of the existing entry point, so the no-arg
   invocation MCP clients use still launches the server. Update flow:
-  `uv tool upgrade blender-mcp && blender-mcp install-addon`.
+  `uv tool upgrade mcpblender && mcpblender install-addon`.
 - **Versions are single-sourced.** `__init__.__version__` now reads the installed
   package version, the addon `bl_info` is set to match `pyproject`, and a test
   (`test_addon_version_matches_package`) fails if they drift again.
@@ -223,8 +228,27 @@ What changed:
   telling the user to run `install-addon` when the addon is older than the server
   (or too old to report its version at all).
 
-Note on publishing: the `blender-mcp` name on PyPI belongs to the upstream
-author, so this "update via PyPI" flow assumes publishing rights to that name (an
-upstream contribution). A standalone fork would publish under a different package
-name and adjust `pyproject` accordingly. The directory installer and version
-handshake work the same either way.
+## Forking to mcpblender
+
+Rather than contribute upstream, this became a standalone fork published under its
+own name, `mcpblender`, on the maintainer's own PyPI and GitHub.
+
+What the rebrand changed:
+
+- **Full rename.** The import package (`blender_mcp` -> `mcpblender`), the CLI
+  command and PyPI distribution (`blender-mcp` -> `mcpblender`), and the Blender
+  addon's display name and sidebar tab (`Blender MCP` / `BlenderMCP` ->
+  `MCPBlender`). Internal Blender identifiers (`blendermcp_*` scene properties,
+  `BLENDERMCP_*` operator classes, `bl_idname`s) were left as-is because they are
+  not user-facing and renaming them is untestable churn.
+- **Telemetry removed entirely.** `telemetry.py`, `telemetry_decorator.py`, the
+  `@telemetry_tool` decorators, the addon's consent preference and Terms operator,
+  and the `supabase`/`tomli` dependencies are all gone. The fork sends no data.
+  (This supersedes section 1 above.)
+- **Attribution preserved.** The MIT license keeps Siddharth Ahuja's original
+  copyright and adds the fork's; the addon header and README credit upstream.
+- **Metadata updated.** `pyproject` author/URLs point at the fork; the addon
+  `bl_info` author is the fork maintainer.
+
+The directory installer and the version handshake are unchanged by the rename;
+they work under any package name.

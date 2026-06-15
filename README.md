@@ -1,8 +1,8 @@
 
 
-# BlenderMCP - Blender Model Context Protocol Integration
+# MCPBlender - Blender Model Context Protocol Integration
 
-BlenderMCP connects Blender to Claude AI through the Model Context Protocol (MCP), allowing Claude to directly interact with and control Blender. This integration enables prompt assisted 3D modeling, scene creation, and manipulation.
+MCPBlender connects Blender to Claude AI through the Model Context Protocol (MCP), allowing Claude to directly interact with and control Blender. This integration enables prompt assisted 3D modeling, scene creation, and manipulation.
 
 **We have no official website. Any website you see online is unofficial and has no affiliation with this project. Use them at your own risk.**
 
@@ -31,7 +31,8 @@ Give feedback, get inspired, and build on top of the MCP: [Discord](https://disc
 - `get_blender_status` reports the connection state and which integrations are enabled. Call it first if a tool reports a connection problem.
 - `execute_blender_code` now accepts `return_screenshot=True` to return a viewport image alongside the result, and surfaces the full Python traceback when the code fails so it can be corrected.
 - The connection reconnects and retries once after a dropped socket, so restarting Blender mid-session no longer breaks the next call.
-- Fixed the per-tool telemetry, which previously never recorded due to decorator ordering. Telemetry remains anonymous and opt-out via `DISABLE_TELEMETRY=1`.
+- The addon ships inside the package, so `mcpblender install-addon` keeps it on the same version as the server (a version handshake warns when it drifts).
+- Removed the telemetry/data-collection code entirely; this fork sends no usage data.
 - See `docs/claude-integration-improvements.md` for the rationale and the full list of changes.
 
 
@@ -40,18 +41,17 @@ Give feedback, get inspired, and build on top of the MCP: [Discord](https://disc
 - Search and download Sketchfab models
 - Support for Poly Haven assets through their API
 - Support to generate 3D models using Hyper3D Rodin
-- Run Blender MCP on a remote host
-- Telemetry for tools executed (completely anonymous)
+- Run the MCP server on a remote host
 
 ### Installing a new version (existing users)
 - For newcomers, you can go straight to Installation. For existing users, see the points below
-- The addon now ships inside the `blender-mcp` package, so the server and addon update together. If you installed the server as a uv tool, update both with:
+- The addon now ships inside the `mcpblender` package, so the server and addon update together. If you installed the server as a uv tool, update both with:
   ```bash
-  uv tool upgrade blender-mcp
-  blender-mcp install-addon
+  uv tool upgrade mcpblender
+  mcpblender install-addon
   ```
-  Then restart Blender. `blender-mcp install-addon --list` shows detected Blender versions; `--all` installs into every one, and `--blender-version 4.2` targets one.
-- Prefer manual? Download the latest `src/blender_mcp/addon.py` and replace the older one in Blender.
+  Then restart Blender. `mcpblender install-addon --list` shows detected Blender versions; `--all` installs into every one, and `--blender-version 4.2` targets one.
+- Prefer manual? Download the latest `src/mcpblender/addon.py` and replace the older one in Blender.
 - If your MCP client caches the server, remove and re-add it (or restart the client) so it picks up the new version.
 - `get_blender_status` reports the server and addon versions and warns when the addon is out of date.
 
@@ -71,7 +71,7 @@ Give feedback, get inspired, and build on top of the MCP: [Discord](https://disc
 The system consists of two main components:
 
 1. **Blender Addon (`addon.py`)**: A Blender addon that creates a socket server within Blender to receive and execute commands
-2. **MCP Server (`src/blender_mcp/server.py`)**: A Python server that implements the Model Context Protocol and connects to the Blender addon
+2. **MCP Server (`src/mcpblender/server.py`)**: A Python server that implements the Model Context Protocol and connects to the Blender addon
 
 ## Installation
 
@@ -123,10 +123,10 @@ Go to Claude > Settings > Developer > Edit Config > claude_desktop_config.json t
 ```json
 {
     "mcpServers": {
-        "blender": {
+        "mcpblender": {
             "command": "uvx",
             "args": [
-                "blender-mcp"
+                "mcpblender"
             ]
         }
     }
@@ -135,7 +135,7 @@ Go to Claude > Settings > Developer > Edit Config > claude_desktop_config.json t
 
 ### Cursor integration
 
-[![Install MCP Server](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/install-mcp?name=blender&config=eyJjb21tYW5kIjoidXZ4IGJsZW5kZXItbWNwIn0%3D)
+[![Install MCP Server](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/install-mcp?name=mcpblender&config=eyJjb21tYW5kIjoidXZ4IG1jcGJsZW5kZXIifQ%3D%3D)
 
 For Mac users, go to Settings > MCP and paste the following 
 
@@ -146,10 +146,10 @@ For Mac users, go to Settings > MCP and paste the following
 ```json
 {
     "mcpServers": {
-        "blender": {
+        "mcpblender": {
             "command": "uvx",
             "args": [
-                "blender-mcp"
+                "mcpblender"
             ]
         }
     }
@@ -161,12 +161,12 @@ For Windows users, go to Settings > MCP > Add Server, add a new server with the 
 ```json
 {
     "mcpServers": {
-        "blender": {
+        "mcpblender": {
             "command": "cmd",
             "args": [
                 "/c",
                 "uvx",
-                "blender-mcp"
+                "mcpblender"
             ]
         }
     }
@@ -181,16 +181,16 @@ For Windows users, go to Settings > MCP > Add Server, add a new server with the 
 
 _Prerequisites_: Make sure you have [Visual Studio Code](https://code.visualstudio.com/) installed before proceeding.
 
-[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_blender--mcp_server-0098FF?style=flat-square&logo=visualstudiocode&logoColor=ffffff)](vscode:mcp/install?%7B%22name%22%3A%22blender-mcp%22%2C%22type%22%3A%22stdio%22%2C%22command%22%3A%22uvx%22%2C%22args%22%3A%5B%22blender-mcp%22%5D%7D)
+[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_mcpblender_server-0098FF?style=flat-square&logo=visualstudiocode&logoColor=ffffff)](vscode:mcp/install?%7B%22name%22%3A%22mcpblender%22%2C%22type%22%3A%22stdio%22%2C%22command%22%3A%22uvx%22%2C%22args%22%3A%5B%22mcpblender%22%5D%7D)
 
 ### Installing the Blender Addon
 
-The addon ships inside the `blender-mcp` package, so you can install it with one
+The addon ships inside the `mcpblender` package, so you can install it with one
 command instead of downloading a file. After installing the server as a uv tool:
 
 ```bash
-uv tool install blender-mcp   # if you have not already
-blender-mcp install-addon
+uv tool install mcpblender   # if you have not already
+mcpblender install-addon
 ```
 
 This copies the addon into your Blender add-ons folder (use `--list` to see
@@ -201,7 +201,7 @@ server, which matters because newer tools require the matching addon.
 
 **Manual install (alternative):**
 
-1. Download `src/blender_mcp/addon.py` from this repo
+1. Download `src/mcpblender/addon.py` from this repo
 2. Open Blender
 3. Go to Edit > Preferences > Add-ons
 4. Click "Install..." and select the `addon.py` file
@@ -211,10 +211,10 @@ server, which matters because newer tools require the matching addon.
 ## Usage
 
 ### Starting the Connection
-![BlenderMCP in the sidebar](assets/addon-instructions.png)
+![MCPBlender in the sidebar](assets/addon-instructions.png)
 
 1. In Blender, go to the 3D View sidebar (press N if not visible)
-2. Find the "BlenderMCP" tab
+2. Find the "MCPBlender" tab
 3. Turn on the Poly Haven checkbox if you want assets from their API (optional)
 4. Click "Connect to Claude"
 5. Make sure the MCP server is running in your terminal
@@ -223,7 +223,7 @@ server, which matters because newer tools require the matching addon.
 
 Once the config file has been set on Claude, and the addon is running on Blender, you will see a hammer icon with tools for the Blender MCP.
 
-![BlenderMCP in the sidebar](assets/hammer-icon.png)
+![MCPBlender in the sidebar](assets/hammer-icon.png)
 
 #### Capabilities
 
@@ -298,10 +298,13 @@ uv run pytest
 The current tests cover the geometry helpers used for Sketchfab model
 size normalization (`_combine_world_bounds`, `_bounds_dimensions`,
 `_normalization_scale` in `addon.py`) and the pure helpers and connection
-behavior in `src/blender_mcp/server.py` (color normalization, environment config
+behavior in `src/mcpblender/server.py` (color normalization, environment config
 loading, reconnect-once-and-retry, structured code-execution errors, and batch
 color normalization).
 
-## Disclaimer
+## Credits and disclaimer
 
-This is a third-party integration and not made by Blender. Made by [Siddharth](https://x.com/sidahuj)
+This is a third-party integration and not made by Blender. MCPBlender is a fork of
+[blender-mcp](https://github.com/ahujasid/blender-mcp) by [Siddharth Ahuja](https://x.com/sidahuj),
+maintained by [Owen Kent](https://github.com/owenpkent). It keeps the original MIT
+license and copyright. Unlike upstream, this fork collects no telemetry.

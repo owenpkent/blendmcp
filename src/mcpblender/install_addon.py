@@ -1,7 +1,7 @@
-"""Install or update the BlenderMCP addon into a local Blender installation.
+"""Install or update the MCPBlender addon into a local Blender installation.
 
-The addon ships inside this package (``blender_mcp/addon.py``), so a single
-``uv tool upgrade blender-mcp`` followed by ``blender-mcp install-addon`` keeps
+The addon ships inside this package (``mcpblender/addon.py``), so a single
+``uv tool upgrade mcpblender`` followed by ``mcpblender install-addon`` keeps
 the MCP server and the Blender addon on the same version. This avoids the manual
 download-and-reinstall step and the server/addon version drift it causes.
 
@@ -18,14 +18,14 @@ from pathlib import Path
 
 # Name the installed file distinctly so it does not collide with other
 # single-file addons (Blender derives the module name from the filename).
-INSTALLED_ADDON_NAME = "blender_mcp_addon.py"
+INSTALLED_ADDON_NAME = "mcpblender_addon.py"
 # Marker used to recognize a legacy manual install (addon.py) of this addon.
-_ADDON_MARKER = '"name": "Blender MCP"'
+_ADDON_MARKER = '"name": "MCPBlender"'
 
 
 def packaged_addon_path() -> Path:
     """Return the path to the addon.py bundled inside this package."""
-    return Path(str(files("blender_mcp") / "addon.py"))
+    return Path(str(files("mcpblender") / "addon.py"))
 
 
 def config_base_dirs() -> list[Path]:
@@ -95,7 +95,7 @@ def install_into(version_dir: Path, source: Path | None = None) -> Path:
     """Install/overwrite the addon into one Blender version directory.
 
     Removes a legacy ``addon.py`` copy of this addon in the same folder so the
-    user does not end up with two BlenderMCP entries. Returns the written path.
+    user does not end up with two MCPBlender entries. Returns the written path.
     """
     source = source or packaged_addon_path()
     target_dir = addons_dir(version_dir)
@@ -136,8 +136,8 @@ def _select_targets(version_dirs: list[Path], requested: str | None, all_version
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="blender-mcp install-addon",
-        description="Install or update the BlenderMCP Blender addon.",
+        prog="mcpblender install-addon",
+        description="Install or update the MCPBlender Blender addon.",
     )
     parser.add_argument(
         "--blender-version",
@@ -199,9 +199,9 @@ def main(argv: list[str] | None = None) -> int:
 
     for version_dir in targets:
         written = install_into(version_dir, source)
-        print(f"Installed BlenderMCP addon -> {written}")
+        print(f"Installed MCPBlender addon -> {written}")
     print(
-        "\nEnable it in Blender: Edit > Preferences > Add-ons, search 'Blender MCP', "
+        "\nEnable it in Blender: Edit > Preferences > Add-ons, search 'MCPBlender', "
         "tick the box. If Blender is already open, restart it first."
     )
     return 0

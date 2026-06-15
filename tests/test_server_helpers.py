@@ -1,23 +1,19 @@
-"""Tests for the pure helpers and connection behavior in ``blender_mcp.server``.
+"""Tests for the pure helpers and connection behavior in ``mcpblender.server``.
 
 These cover color normalization, bounding-box ratio processing, environment
 config loading, the reconnect-once-and-retry logic, and the tool-level handling
 of structured code-execution errors and batch color normalization. None of them
-need a live Blender, so they run with fakes. Telemetry is disabled via
-environment variable to keep the import side-effect-free.
+need a live Blender, so they run with fakes.
 """
 import json
-import os
 import socket
-
-os.environ.setdefault("DISABLE_TELEMETRY", "1")
 
 import pytest
 
-import blender_mcp.server as server
-from blender_mcp.server import (
+import mcpblender.server as server
+from mcpblender.server import (
     BlenderConnection,
-    BlenderMCPConfig,
+    MCPBlenderConfig,
     _addon_staleness,
     _normalize_rgba,
     _process_bbox,
@@ -89,12 +85,12 @@ def test_process_bbox_rejects_non_positive_floats():
         _process_bbox([0.0, 1.0, 2.0])
 
 
-# --- BlenderMCPConfig.from_env ---
+# --- MCPBlenderConfig.from_env ---
 
 def test_config_defaults(monkeypatch):
     monkeypatch.delenv("BLENDER_HOST", raising=False)
     monkeypatch.delenv("BLENDER_PORT", raising=False)
-    cfg = BlenderMCPConfig.from_env()
+    cfg = MCPBlenderConfig.from_env()
     assert cfg.host == "localhost"
     assert cfg.port == 9876
 
@@ -102,14 +98,14 @@ def test_config_defaults(monkeypatch):
 def test_config_reads_env(monkeypatch):
     monkeypatch.setenv("BLENDER_HOST", "1.2.3.4")
     monkeypatch.setenv("BLENDER_PORT", "9999")
-    cfg = BlenderMCPConfig.from_env()
+    cfg = MCPBlenderConfig.from_env()
     assert cfg.host == "1.2.3.4"
     assert cfg.port == 9999
 
 
 def test_config_malformed_port_falls_back(monkeypatch):
     monkeypatch.setenv("BLENDER_PORT", "not-a-number")
-    cfg = BlenderMCPConfig.from_env()
+    cfg = MCPBlenderConfig.from_env()
     assert cfg.port == 9876  # default, not a crash
 
 
@@ -163,7 +159,7 @@ def test_execute_blender_code_surfaces_traceback(monkeypatch):
             }
 
     monkeypatch.setattr(server, "get_blender_connection", lambda: FakeConn())
-    out = server.execute_blender_code.__wrapped__(_Ctx(), code="foo()")
+    out = server.execute_blender_code(_Ctx(), code="foo()")
     assert "Code execution failed" in out
     assert "NameError" in out
     assert "Traceback" in out
@@ -185,7 +181,7 @@ def test_batch_edit_normalizes_material_colors(monkeypatch):
         {"op": "set_material", "object_name": "Cube", "color": [1, 0, 0]},
         {"op": "modify_object", "name": "Cube", "location": [1, 2, 3]},
     ]
-    server.batch_edit.__wrapped__(_Ctx(), operations=ops)
+    server.batch_edit(_Ctx(), operations=ops)
     sent = captured["params"]["operations"]
     assert sent[0]["color"] == [1.0, 0.0, 0.0, 1.0]  # padded to RGBA
     assert sent[1] == {"op": "modify_object", "name": "Cube", "location": [1, 2, 3]}
