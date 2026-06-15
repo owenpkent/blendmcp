@@ -31,7 +31,7 @@ Full details and other clients are in [Installation](#installation) below.
 
 ## Release notes
 
-Full per-version history is in [CHANGELOG.md](CHANGELOG.md). The latest release is **1.4.2**.
+Full per-version history is in [CHANGELOG.md](CHANGELOG.md). The latest release is **1.4.3**.
 
 ### What this fork adds
 - Structured editing tools: `add_primitive`, `modify_object`, `set_material`, `duplicate_object`, and `delete_object`. These are more reliable than generating raw Python and they return the affected object's bounding box and dimensions so the result is confirmed in one step.
@@ -284,6 +284,7 @@ The system uses a simple JSON-based protocol over TCP sockets:
 - The `execute_blender_code` tool allows running arbitrary Python code in Blender, which can be powerful but potentially dangerous. Use with caution in production environments. ALWAYS save your work before using it.
 - Poly Haven requires downloading models, textures, and HDRI images. If you do not want to use it, please turn it off in the checkbox in Blender. 
 - Complex operations might need to be broken down into smaller steps
+- To report a security vulnerability, see [SECURITY.md](SECURITY.md).
 
 
 ## Contributing

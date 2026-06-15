@@ -26,7 +26,7 @@ bl_info = {
     "author": "Owen Kent",
     # Keep this in lockstep with the package version in pyproject.toml.
     # tests/test_install_addon.py asserts they match.
-    "version": (1, 4, 2),
+    "version": (1, 4, 3),
     "blender": (3, 0, 0),
     "location": "View3D > Sidebar > BlendMCP",
     "description": "Connect Blender to Claude via MCP",
@@ -38,6 +38,12 @@ RODIN_FREE_TRIAL_KEY = "k9TcfFoEhNd9cCPP2guHAHHHkctZHIRhZDywZ1euGUXwihbYLpOjQhof
 # Add User-Agent as required by Poly Haven API
 REQ_HEADERS = requests.utils.default_headers()
 REQ_HEADERS.update({"User-Agent": "blendmcp"})
+
+# Network timeouts (seconds). Without a timeout a stalled connection blocks the
+# Blender thread indefinitely. Use a short timeout for JSON/API calls and a
+# longer one for downloading or generating assets that can be large or slow.
+REQ_TIMEOUT = 60
+DOWNLOAD_TIMEOUT = 300
 
 
 def _combine_world_bounds(world_corners):
@@ -688,7 +694,7 @@ class BlendMCPServer:
             if asset_type not in ["hdris", "textures", "models", "all"]:
                 return {"error": f"Invalid asset type: {asset_type}. Must be one of: hdris, textures, models, all"}
 
-            response = requests.get(f"https://api.polyhaven.com/categories/{asset_type}", headers=REQ_HEADERS)
+            response = requests.get(f"https://api.polyhaven.com/categories/{asset_type}", headers=REQ_HEADERS, timeout=REQ_TIMEOUT)
             if response.status_code == 200:
                 return {"categories": response.json()}
             else:
@@ -710,7 +716,7 @@ class BlendMCPServer:
             if categories:
                 params["categories"] = categories
 
-            response = requests.get(url, params=params, headers=REQ_HEADERS)
+            response = requests.get(url, params=params, headers=REQ_HEADERS, timeout=REQ_TIMEOUT)
             if response.status_code == 200:
                 # Limit the response size to avoid overwhelming Blender
                 assets = response.json()
@@ -730,7 +736,7 @@ class BlendMCPServer:
     def download_polyhaven_asset(self, asset_id, asset_type, resolution="1k", file_format=None):
         try:
             # First get the files information
-            files_response = requests.get(f"https://api.polyhaven.com/files/{asset_id}", headers=REQ_HEADERS)
+            files_response = requests.get(f"https://api.polyhaven.com/files/{asset_id}", headers=REQ_HEADERS, timeout=REQ_TIMEOUT)
             if files_response.status_code != 200:
                 return {"error": f"Failed to get asset files: {files_response.status_code}"}
 
@@ -750,7 +756,7 @@ class BlendMCPServer:
                     # since Blender can't properly load HDR data directly from memory
                     with tempfile.NamedTemporaryFile(suffix=f".{file_format}", delete=False) as tmp_file:
                         # Download the file
-                        response = requests.get(file_url, headers=REQ_HEADERS)
+                        response = requests.get(file_url, headers=REQ_HEADERS, timeout=DOWNLOAD_TIMEOUT)
                         if response.status_code != 200:
                             return {"error": f"Failed to download HDRI: {response.status_code}"}
 
@@ -846,7 +852,7 @@ class BlendMCPServer:
                                 # Use NamedTemporaryFile like we do for HDRIs
                                 with tempfile.NamedTemporaryFile(suffix=f".{file_format}", delete=False) as tmp_file:
                                     # Download the file
-                                    response = requests.get(file_url, headers=REQ_HEADERS)
+                                    response = requests.get(file_url, headers=REQ_HEADERS, timeout=DOWNLOAD_TIMEOUT)
                                     if response.status_code == 200:
                                         tmp_file.write(response.content)
                                         tmp_path = tmp_file.name
@@ -983,7 +989,7 @@ class BlendMCPServer:
                         main_file_name = file_url.split("/")[-1]
                         main_file_path = os.path.join(temp_dir, main_file_name)
 
-                        response = requests.get(file_url, headers=REQ_HEADERS)
+                        response = requests.get(file_url, headers=REQ_HEADERS, timeout=DOWNLOAD_TIMEOUT)
                         if response.status_code != 200:
                             return {"error": f"Failed to download model: {response.status_code}"}
 
@@ -1001,7 +1007,7 @@ class BlendMCPServer:
                                 os.makedirs(os.path.dirname(include_file_path), exist_ok=True)
 
                                 # Download the included file
-                                include_response = requests.get(include_url, headers=REQ_HEADERS)
+                                include_response = requests.get(include_url, headers=REQ_HEADERS, timeout=DOWNLOAD_TIMEOUT)
                                 if include_response.status_code == 200:
                                     with open(include_file_path, "wb") as f:
                                         f.write(include_response.content)
@@ -1431,7 +1437,8 @@ class BlendMCPServer:
                 headers={
                     "Authorization": f"Bearer {bpy.context.scene.blendermcp_hyper3d_api_key}",
                 },
-                files=files
+                files=files,
+                timeout=REQ_TIMEOUT,
             )
             data = response.json()
             return data
@@ -1460,7 +1467,8 @@ class BlendMCPServer:
                     "Authorization": f"Key {bpy.context.scene.blendermcp_hyper3d_api_key}",
                     "Content-Type": "application/json",
                 },
-                json=req_data
+                json=req_data,
+                timeout=REQ_TIMEOUT,
             )
             data = response.json()
             return data
@@ -1486,6 +1494,7 @@ class BlendMCPServer:
             json={
                 "subscription_key": subscription_key,
             },
+            timeout=REQ_TIMEOUT,
         )
         data = response.json()
         return {
@@ -1499,6 +1508,7 @@ class BlendMCPServer:
             headers={
                 "Authorization": f"KEY {bpy.context.scene.blendermcp_hyper3d_api_key}",
             },
+            timeout=REQ_TIMEOUT,
         )
         data = response.json()
         return data
@@ -1588,7 +1598,8 @@ class BlendMCPServer:
             },
             json={
                 'task_uuid': task_uuid
-            }
+            },
+            timeout=REQ_TIMEOUT,
         )
         data_ = response.json()
         temp_file = None
@@ -1602,7 +1613,7 @@ class BlendMCPServer:
 
                 try:
                     # Download the content
-                    response = requests.get(i["url"], stream=True)
+                    response = requests.get(i["url"], stream=True, timeout=DOWNLOAD_TIMEOUT)
                     response.raise_for_status()  # Raise an exception for HTTP errors
 
                     # Write the content to the temporary file
@@ -1651,7 +1662,8 @@ class BlendMCPServer:
             f"https://queue.fal.run/fal-ai/hyper3d/requests/{request_id}",
             headers={
                 "Authorization": f"Key {bpy.context.scene.blendermcp_hyper3d_api_key}",
-            }
+            },
+            timeout=REQ_TIMEOUT,
         )
         data_ = response.json()
         temp_file = None
@@ -1664,7 +1676,7 @@ class BlendMCPServer:
 
         try:
             # Download the content
-            response = requests.get(data_["model_mesh"]["url"], stream=True)
+            response = requests.get(data_["model_mesh"]["url"], stream=True, timeout=DOWNLOAD_TIMEOUT)
             response.raise_for_status()  # Raise an exception for HTTP errors
 
             # Write the content to the temporary file
@@ -2309,7 +2321,8 @@ class BlendMCPServer:
             response = requests.post(
                 endpoint,
                 headers = headers,
-                data = json.dumps(data)
+                data = json.dumps(data),
+                timeout=REQ_TIMEOUT,
             )
 
             if response.status_code == 200:
@@ -2353,7 +2366,7 @@ class BlendMCPServer:
             if image:
                 if re.match(r'^https?://', image, re.IGNORECASE) is not None:
                     try:
-                        resImg = requests.get(image)
+                        resImg = requests.get(image, timeout=DOWNLOAD_TIMEOUT)
                         resImg.raise_for_status()
                         image_base64 = base64.b64encode(resImg.content).decode("ascii")
                         data["image"] = image_base64
@@ -2371,6 +2384,7 @@ class BlendMCPServer:
             response = requests.post(
                 f"{base_url}/generate",
                 json = data,
+                timeout=DOWNLOAD_TIMEOUT,
             )
 
             if response.status_code != 200:
@@ -2436,7 +2450,8 @@ class BlendMCPServer:
             response = requests.post(
                 endpoint,
                 headers=headers,
-                data=json.dumps(data)
+                data=json.dumps(data),
+                timeout=REQ_TIMEOUT,
             )
 
             if response.status_code == 200:
@@ -2466,7 +2481,7 @@ class BlendMCPServer:
 
         try:
             # Download ZIP file
-            zip_response = requests.get(zip_file_url, stream=True)
+            zip_response = requests.get(zip_file_url, stream=True, timeout=DOWNLOAD_TIMEOUT)
             zip_response.raise_for_status()
             with open(zip_file_path, "wb") as f:
                 for chunk in zip_response.iter_content(chunk_size=8192):

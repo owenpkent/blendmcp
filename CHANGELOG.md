@@ -5,6 +5,22 @@ fork of [blender-mcp](https://github.com/ahujasid/blender-mcp); the entries belo
 cover the fork's own releases. Versions are published on
 [PyPI](https://pypi.org/project/blendmcp/).
 
+## 1.4.3
+
+Security and dependency maintenance. No changes to tool behavior.
+
+- Updated dependencies to current releases, picking up upstream security fixes
+  (`mcp`, `starlette`, `h11`, `idna`, `pygments`, `python-dotenv`). The server
+  uses the stdio transport, so the HTTP-transport advisories did not apply, but
+  the versions are refreshed regardless.
+- Added request timeouts to every outbound HTTP call in the add-on (Poly Haven,
+  Sketchfab, Hyper3D, Hunyuan3D) so a stalled download no longer hangs Blender.
+- Hardened the GitHub Actions workflows: pinned actions to commit SHAs, dropped
+  persisted credentials on checkout, and scoped `GITHUB_TOKEN` to least
+  privilege.
+- Added a security policy (`SECURITY.md`) and Dependabot configuration for
+  weekly dependency and action updates.
+
 ## 1.4.2
 
 - Renamed the Python import module to `blendmcp` (`import blendmcp`). The project
