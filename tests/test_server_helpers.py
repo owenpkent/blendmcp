@@ -1,17 +1,44 @@
-"""Tests for the pure helpers in ``blender_mcp.server``.
+"""Tests for the pure helpers and connection behavior in ``blender_mcp.server``.
 
-These cover the color normalization used by the ``set_material`` tool and the
-bounding-box ratio processing used by the Hyper3D generation tools. Neither
-helper needs a Blender connection, so they can be exercised directly. Telemetry
-is disabled via environment variable to keep the import side-effect-free.
+These cover color normalization, bounding-box ratio processing, environment
+config loading, the reconnect-once-and-retry logic, and the tool-level handling
+of structured code-execution errors and batch color normalization. None of them
+need a live Blender, so they run with fakes. Telemetry is disabled via
+environment variable to keep the import side-effect-free.
 """
+import json
 import os
+import socket
 
 os.environ.setdefault("DISABLE_TELEMETRY", "1")
 
 import pytest
 
-from blender_mcp.server import _normalize_rgba, _process_bbox
+import blender_mcp.server as server
+from blender_mcp.server import (
+    BlenderConnection,
+    BlenderMCPConfig,
+    _normalize_rgba,
+    _process_bbox,
+    _wait_for_stable_file,
+)
+
+
+class _FakeSock:
+    """Minimal stand-in for a connected socket."""
+
+    def sendall(self, data):
+        pass
+
+    def settimeout(self, timeout):
+        pass
+
+    def close(self):
+        pass
+
+
+class _Ctx:
+    """Placeholder MCP Context; the tools never touch it in these tests."""
 
 
 def test_normalize_rgba_none_passes_through():
@@ -59,3 +86,118 @@ def test_process_bbox_floats_normalized_to_percent_of_max():
 def test_process_bbox_rejects_non_positive_floats():
     with pytest.raises(ValueError):
         _process_bbox([0.0, 1.0, 2.0])
+
+
+# --- BlenderMCPConfig.from_env ---
+
+def test_config_defaults(monkeypatch):
+    monkeypatch.delenv("BLENDER_HOST", raising=False)
+    monkeypatch.delenv("BLENDER_PORT", raising=False)
+    cfg = BlenderMCPConfig.from_env()
+    assert cfg.host == "localhost"
+    assert cfg.port == 9876
+
+
+def test_config_reads_env(monkeypatch):
+    monkeypatch.setenv("BLENDER_HOST", "1.2.3.4")
+    monkeypatch.setenv("BLENDER_PORT", "9999")
+    cfg = BlenderMCPConfig.from_env()
+    assert cfg.host == "1.2.3.4"
+    assert cfg.port == 9999
+
+
+def test_config_malformed_port_falls_back(monkeypatch):
+    monkeypatch.setenv("BLENDER_PORT", "not-a-number")
+    cfg = BlenderMCPConfig.from_env()
+    assert cfg.port == 9876  # default, not a crash
+
+
+# --- reconnect-once-and-retry ---
+
+def _connection_with_recv(recv_fn):
+    conn = BlenderConnection(host="h", port=1)
+    conn.sock = _FakeSock()
+    conn.connect = lambda timeout=5.0: (setattr(conn, "sock", _FakeSock()) or True)
+    conn.receive_full_response = recv_fn
+    return conn
+
+
+def test_send_command_retries_once_on_connection_error():
+    calls = {"n": 0}
+
+    def recv(sock, buffer_size=8192):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise ConnectionResetError("socket died")
+        return json.dumps({"status": "success", "result": {"ok": True}}).encode()
+
+    conn = _connection_with_recv(recv)
+    assert conn.send_command("get_scene_info") == {"ok": True}
+    assert calls["n"] == 2  # original attempt + one retry
+
+
+def test_send_command_does_not_retry_on_timeout():
+    calls = {"n": 0}
+
+    def recv(sock, buffer_size=8192):
+        calls["n"] += 1
+        raise socket.timeout()
+
+    conn = _connection_with_recv(recv)
+    with pytest.raises(Exception):
+        conn.send_command("execute_code", {"code": "x"})
+    assert calls["n"] == 1  # not retried; Blender may still be running it
+
+
+# --- execute_blender_code structured failure ---
+
+def test_execute_blender_code_surfaces_traceback(monkeypatch):
+    class FakeConn:
+        def send_command(self, cmd, params=None):
+            return {
+                "executed": False,
+                "result": "partial output",
+                "error": "NameError: name 'foo' is not defined",
+                "traceback": "Traceback (most recent call last):\nNameError: ...",
+            }
+
+    monkeypatch.setattr(server, "get_blender_connection", lambda: FakeConn())
+    out = server.execute_blender_code.__wrapped__(_Ctx(), code="foo()")
+    assert "Code execution failed" in out
+    assert "NameError" in out
+    assert "Traceback" in out
+    assert "partial output" in out
+
+
+# --- batch_edit color normalization ---
+
+def test_batch_edit_normalizes_material_colors(monkeypatch):
+    captured = {}
+
+    class FakeConn:
+        def send_command(self, cmd, params=None):
+            captured["params"] = params
+            return {"total": 1, "applied": 1, "failed": 0, "results": []}
+
+    monkeypatch.setattr(server, "get_blender_connection", lambda: FakeConn())
+    ops = [
+        {"op": "set_material", "object_name": "Cube", "color": [1, 0, 0]},
+        {"op": "modify_object", "name": "Cube", "location": [1, 2, 3]},
+    ]
+    server.batch_edit.__wrapped__(_Ctx(), operations=ops)
+    sent = captured["params"]["operations"]
+    assert sent[0]["color"] == [1.0, 0.0, 0.0, 1.0]  # padded to RGBA
+    assert sent[1] == {"op": "modify_object", "name": "Cube", "location": [1, 2, 3]}
+
+
+# --- screenshot file-stability wait ---
+
+def test_wait_for_stable_file_true_for_existing_file(tmp_path):
+    f = tmp_path / "shot.png"
+    f.write_bytes(b"some bytes")
+    assert _wait_for_stable_file(str(f), timeout=1.0) is True
+
+
+def test_wait_for_stable_file_false_when_missing(tmp_path):
+    missing = tmp_path / "nope.png"
+    assert _wait_for_stable_file(str(missing), timeout=0.2) is False

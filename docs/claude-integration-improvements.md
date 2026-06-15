@@ -125,48 +125,73 @@ right calls. What it does that we do not yet:
 
 - **A health/status tool.** `ue_status` is the documented "call this first if a
   tool fails" entry point. It returns a diagnostic object (connected, which
-  instance, discovered instances, and a `hint` when nothing is found). We could
-  add `get_blender_status()` that reports connection state, which integrations
-  are enabled, and a hint, instead of leaving connection debugging to the user.
+  instance, discovered instances, and a `hint` when nothing is found).
+
+  **Implemented.** `get_blender_status()` reports the configured host/port,
+  whether the connection is live, which integrations are enabled, and a `hint`
+  for fixing a failed connection. Its docstring tells the model to call it first
+  when another tool reports a connection problem.
 
 - **Reconnect-once-and-retry.** On a transport error, uemcp closes the
   connection, reconnects, and retries the command once, so an editor restart
-  mid-session is invisible. Our `send_command` invalidates the socket on error
-  but makes the *next* call reconnect rather than transparently retrying the
-  failed one. A single in-place retry would smooth over Blender restarts.
+  mid-session is invisible.
+
+  **Implemented.** `send_command` now reconnects and retries once on a
+  connection-level error. Timeouts are deliberately *not* retried, because
+  Blender may still be executing the original command and a retry could
+  double-apply a mutation.
 
 - **Sentinel-framed results with tracebacks.** uemcp wraps every host-side
-  snippet in a harness that catches exceptions and prints
-  `__UEMCP_RESULT__{json}` to the log, then parses that line back out, so it gets
-  both structured results and the full Python traceback. Our `execute_code`
-  returns only captured stdout. Adopting a sentinel + traceback would make
-  failures in generated code far easier for Claude to diagnose. This pairs well
-  with the "structured errors" item above.
+  snippet in a harness that catches exceptions and returns both structured
+  results and the full Python traceback.
+
+  **Implemented (without the literal sentinel).** Our socket protocol already
+  returns structured JSON, so the win was the traceback: `execute_code` now
+  returns `{executed, result, error, traceback}` instead of raising, and
+  `execute_blender_code` surfaces the error and traceback to the model so it can
+  correct the code. This also covers the "structured errors" item above for the
+  arbitrary-code path.
 
 - **Centralized env config with safe defaults.** uemcp has a config dataclass
   with a `from_env()` that type-converts each setting and falls back to the
-  default on a malformed value instead of crashing. We read `BLENDER_HOST` /
-  `BLENDER_PORT` inline; a small config object would centralize this and tolerate
-  bad input.
+  default on a malformed value instead of crashing.
 
-- **Batch edits.** `ue_batch_edit` selects many objects and applies several
-  operations in one round trip, returning per-item `{ok, error}` results. For
-  "make all the chairs red" style requests this avoids N socket round trips. A
-  `batch_edit` tool over our structured handlers would cut latency for bulk
-  changes.
+  **Implemented.** `BlenderMCPConfig.from_env()` loads `BLENDER_HOST` /
+  `BLENDER_PORT`, logging a warning and keeping the default when the port is
+  malformed instead of crashing on `int(...)`.
 
-- **Compile-check tests for generated code.** uemcp unit tests every snippet
-  builder by `compile()`-ing the generated source, catching syntax errors in CI
-  without the host app. If we ever extract reusable code templates, the same
-  cheap test applies.
+- **Batch edits.** `ue_batch_edit` applies several operations in one round trip,
+  returning per-item `{ok, error}` results.
+
+  **Implemented.** `batch_edit(operations)` runs a list of `add_primitive` /
+  `modify_object` / `set_material` / `duplicate_object` / `delete_object` ops in
+  order and returns `{total, applied, failed, results}` with per-op outcomes. A
+  failed op does not stop the batch. `set_material` colors are normalized before
+  sending.
 
 - **Screenshot file-stability polling.** uemcp waits for the screenshot file to
-  appear and for its size to stop changing before reading it. Our capture reads
-  immediately; polling for stability would make screenshots more reliable,
-  especially the first (cold) capture of a session.
+  appear and stop changing in size before reading it.
+
+  **Implemented.** `_wait_for_stable_file` waits for the capture file to exist
+  and its size to settle before reading. Blender's screenshot op is synchronous,
+  so this is a cheap safety margin rather than a strict need, but it removes a
+  race on slow disks and cold captures.
+
+- **Compile-check tests for generated code.** uemcp unit tests every snippet
+  builder by `compile()`-ing the generated source.
+
+  **Not applicable.** blender-mcp sends structured commands rather than generated
+  Python templates, so there is no snippet source to compile-check. The
+  equivalent investment here is the expanded `tests/test_server_helpers.py`
+  coverage (config loading, retry/no-retry, traceback surfacing, batch color
+  normalization, file-stability wait).
 
 Things we already do that uemcp does not: anonymous telemetry, an async lifespan,
 exposing the screenshot path as an MCP-style image return, and more generation
-backends (Hyper3D Rodin, Hunyuan3D). The highest-value, lowest-effort ports are
-the **status tool**, **reconnect-once-and-retry**, and **sentinel + traceback
-error reporting**.
+backends (Hyper3D Rodin, Hunyuan3D).
+
+Still open from the broader list above: self-completing generation, a fully
+structured error shape across *all* tools (the traceback work covers the
+arbitrary-code path), dropping the per-call PolyHaven ping in
+`get_blender_connection`, exposing the scene as an MCP resource, and undo
+checkpoints before `execute_blender_code`.

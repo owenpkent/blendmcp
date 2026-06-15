@@ -5,6 +5,7 @@ import json
 import asyncio
 import logging
 import tempfile
+import time
 from dataclasses import dataclass
 from contextlib import asynccontextmanager
 from typing import AsyncIterator, Dict, Any, List
@@ -25,6 +26,28 @@ logger = logging.getLogger("BlenderMCPServer")
 # Default configuration
 DEFAULT_HOST = "localhost"
 DEFAULT_PORT = 9876
+
+
+@dataclass
+class BlenderMCPConfig:
+    """Connection configuration, loaded from the environment with safe defaults."""
+    host: str = DEFAULT_HOST
+    port: int = DEFAULT_PORT
+
+    @classmethod
+    def from_env(cls) -> "BlenderMCPConfig":
+        cfg = cls()
+        cfg.host = os.getenv("BLENDER_HOST", cfg.host)
+        raw_port = os.getenv("BLENDER_PORT")
+        if raw_port is not None:
+            try:
+                cfg.port = int(raw_port)
+            except ValueError:
+                logger.warning(
+                    f"Invalid BLENDER_PORT={raw_port!r}; using default {cfg.port}"
+                )
+        return cfg
+
 
 @dataclass
 class BlenderConnection:
@@ -123,16 +146,22 @@ class BlenderConnection:
         else:
             raise Exception("No data received")
 
-    def send_command(self, command_type: str, params: Dict[str, Any] = None) -> Dict[str, Any]:
-        """Send a command to Blender and return the response"""
+    def send_command(self, command_type: str, params: Dict[str, Any] = None,
+                     allow_retry: bool = True) -> Dict[str, Any]:
+        """Send a command to Blender and return the response.
+
+        On a connection-level failure (socket dead, e.g. Blender was restarted)
+        the connection is rebuilt and the command is retried once. Timeouts are
+        not retried, since Blender may still be executing the original command.
+        """
         if not self.sock and not self.connect():
             raise ConnectionError("Not connected to Blender")
-        
+
         command = {
             "type": command_type,
             "params": params or {}
         }
-        
+
         try:
             # Log the command being sent
             logger.info(f"Sending command: {command_type} with params: {params}")
@@ -165,6 +194,11 @@ class BlenderConnection:
         except (ConnectionError, BrokenPipeError, ConnectionResetError) as e:
             logger.error(f"Socket connection error: {str(e)}")
             self.sock = None
+            # The editor may have restarted since the last call; reconnect and
+            # retry the command once before giving up.
+            if allow_retry and self.connect():
+                logger.info("Reconnected to Blender, retrying command once")
+                return self.send_command(command_type, params, allow_retry=False)
             raise Exception(f"Connection to Blender lost: {str(e)}")
         except json.JSONDecodeError as e:
             logger.error(f"Invalid JSON response from Blender: {str(e)}")
@@ -249,9 +283,8 @@ def get_blender_connection():
     
     # Create a new connection if needed
     if _blender_connection is None:
-        host = os.getenv("BLENDER_HOST", DEFAULT_HOST)
-        port = int(os.getenv("BLENDER_PORT", DEFAULT_PORT))
-        _blender_connection = BlenderConnection(host=host, port=port)
+        config = BlenderMCPConfig.from_env()
+        _blender_connection = BlenderConnection(host=config.host, port=config.port)
         if not _blender_connection.connect():
             logger.error("Failed to connect to Blender")
             _blender_connection = None
@@ -259,6 +292,51 @@ def get_blender_connection():
         logger.info("Created new persistent connection to Blender")
     
     return _blender_connection
+
+
+@mcp.tool()
+@telemetry_tool("get_blender_status")
+def get_blender_status(ctx: Context) -> str:
+    """
+    Report whether the MCP server can reach Blender and which integrations are
+    enabled. Call this first if another tool reports a connection problem; the
+    result includes a hint for fixing a failed connection.
+    """
+    config = BlenderMCPConfig.from_env()
+    status = {
+        "host": config.host,
+        "port": config.port,
+        "connected": False,
+        "integrations": {},
+        "hint": None,
+    }
+    try:
+        blender = get_blender_connection()
+        status["connected"] = True
+        for key, command in (
+            ("polyhaven", "get_polyhaven_status"),
+            ("hyper3d", "get_hyper3d_status"),
+            ("sketchfab", "get_sketchfab_status"),
+            ("hunyuan3d", "get_hunyuan3d_status"),
+        ):
+            try:
+                result = blender.send_command(command)
+                if isinstance(result, dict) and "enabled" in result:
+                    status["integrations"][key] = bool(result.get("enabled"))
+                else:
+                    # Some status commands only return a message; treat presence
+                    # of a non-empty message as "reachable but state unknown".
+                    status["integrations"][key] = "unknown"
+            except Exception as integration_error:
+                status["integrations"][key] = f"error: {integration_error}"
+    except Exception as e:
+        status["error"] = str(e)
+        status["hint"] = (
+            "Could not reach Blender. Make sure Blender is running, the BlenderMCP "
+            "addon is enabled, and you clicked 'Connect to Claude' in the BlenderMCP "
+            "sidebar (press N in the 3D viewport to show it)."
+        )
+    return json.dumps(status, indent=2)
 
 
 @mcp.tool()
@@ -294,6 +372,24 @@ def get_object_info(ctx: Context, object_name: str) -> str:
         logger.error(f"Error getting object info from Blender: {str(e)}")
         return f"Error getting object info: {str(e)}"
 
+def _wait_for_stable_file(path: str, timeout: float = 5.0, interval: float = 0.05) -> bool:
+    """Wait until a file exists and its size stops changing.
+
+    Guards against reading a screenshot before the writer has finished flushing
+    it. Returns True if the file looks fully written, False on timeout.
+    """
+    deadline = time.monotonic() + timeout
+    last_size = -1
+    while time.monotonic() < deadline:
+        if os.path.exists(path):
+            size = os.path.getsize(path)
+            if size > 0 and size == last_size:
+                return True
+            last_size = size
+        time.sleep(interval)
+    return os.path.exists(path) and os.path.getsize(path) > 0
+
+
 def _capture_viewport_image(blender, max_size: int = 800) -> Image:
     """Capture the Blender viewport and return it as an MCP Image.
 
@@ -312,7 +408,7 @@ def _capture_viewport_image(blender, max_size: int = 800) -> Image:
     if "error" in result:
         raise Exception(result["error"])
 
-    if not os.path.exists(temp_path):
+    if not _wait_for_stable_file(temp_path):
         raise Exception("Screenshot file was not created")
 
     with open(temp_path, 'rb') as f:
@@ -364,6 +460,20 @@ def execute_blender_code(ctx: Context, code: str, return_screenshot: bool = Fals
         # Get the global connection
         blender = get_blender_connection()
         result = blender.send_command("execute_code", {"code": code})
+
+        # The addon returns a structured result; surface the traceback on failure
+        # so the model can correct the code instead of just seeing "Error".
+        if isinstance(result, dict) and result.get("executed") is False:
+            error = result.get("error", "Unknown error")
+            tb = result.get("traceback", "")
+            stdout = result.get("result", "")
+            parts = [f"Code execution failed: {error}"]
+            if stdout:
+                parts.append(f"\nOutput before the error:\n{stdout}")
+            if tb:
+                parts.append(f"\n{tb}")
+            return "\n".join(parts).rstrip()
+
         text = f"Code executed successfully: {result.get('result', '')}"
 
         if return_screenshot:
@@ -567,6 +677,42 @@ def duplicate_object(
     except Exception as e:
         logger.error(f"Error duplicating object: {str(e)}")
         return f"Error duplicating object: {str(e)}"
+
+
+@mcp.tool()
+@telemetry_tool("batch_edit")
+def batch_edit(ctx: Context, operations: list[dict]) -> str:
+    """
+    Apply several editing operations in a single round trip. Use this for bulk
+    changes (for example coloring or moving many objects) instead of calling the
+    individual tools once per object.
+
+    Parameters:
+    - operations: A list of operations applied in order. Each item is an object
+      with an "op" field plus that operation's parameters:
+        {"op": "add_primitive", "primitive_type": "CUBE", "location": [0,0,0]}
+        {"op": "modify_object", "name": "Cube", "location": [1,0,0]}
+        {"op": "set_material", "object_name": "Cube", "color": [1,0,0]}
+        {"op": "duplicate_object", "name": "Cube", "new_name": "Cube2"}
+        {"op": "delete_object", "name": "Cube2"}
+
+    Returns a summary with total/applied/failed counts and a per-operation list of
+    {index, op, ok, result|error}. A failed operation does not stop the batch.
+    """
+    try:
+        normalized = []
+        for operation in operations:
+            operation = dict(operation)
+            if operation.get("op") == "set_material" and operation.get("color") is not None:
+                operation["color"] = _normalize_rgba(operation["color"])
+            normalized.append(operation)
+        blender = get_blender_connection()
+        result = blender.send_command("batch_edit", {"operations": normalized})
+        return json.dumps(result, indent=2)
+    except Exception as e:
+        logger.error(f"Error in batch_edit: {str(e)}")
+        return f"Error in batch_edit: {str(e)}"
+
 
 @mcp.tool()
 @telemetry_tool("get_polyhaven_categories")

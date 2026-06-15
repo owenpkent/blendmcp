@@ -27,7 +27,10 @@ Give feedback, get inspired, and build on top of the MCP: [Discord](https://disc
 
 ### Recent improvements
 - Structured editing tools: `add_primitive`, `modify_object`, `set_material`, `duplicate_object`, and `delete_object`. These are more reliable than generating raw Python and they return the affected object's bounding box and dimensions so the result is confirmed in one step.
-- `execute_blender_code` now accepts `return_screenshot=True` to return a viewport image alongside the result, so the effect of custom code can be seen without a separate call.
+- `batch_edit` applies many editing operations in a single round trip, with per-operation results, for bulk changes.
+- `get_blender_status` reports the connection state and which integrations are enabled. Call it first if a tool reports a connection problem.
+- `execute_blender_code` now accepts `return_screenshot=True` to return a viewport image alongside the result, and surfaces the full Python traceback when the code fails so it can be corrected.
+- The connection reconnects and retries once after a dropped socket, so restarting Blender mid-session no longer breaks the next call.
 - Fixed the per-tool telemetry, which previously never recorded due to decorator ordering. Telemetry remains anonymous and opt-out via `DISABLE_TELEMETRY=1`.
 - See `docs/claude-integration-improvements.md` for the rationale and the full list of changes.
 
@@ -271,7 +274,10 @@ uv run pytest
 
 The current tests cover the geometry helpers used for Sketchfab model
 size normalization (`_combine_world_bounds`, `_bounds_dimensions`,
-`_normalization_scale` in `addon.py`).
+`_normalization_scale` in `addon.py`) and the pure helpers and connection
+behavior in `src/blender_mcp/server.py` (color normalization, environment config
+loading, reconnect-once-and-retry, structured code-execution errors, and batch
+color normalization).
 
 ## Disclaimer
 

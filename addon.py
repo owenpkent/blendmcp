@@ -263,6 +263,7 @@ class BlenderMCPServer:
             "delete_object": self.delete_object,
             "set_material": self.set_object_material,
             "duplicate_object": self.duplicate_object,
+            "batch_edit": self.batch_edit,
             "get_telemetry_consent": self.get_telemetry_consent,
             "get_polyhaven_status": self.get_polyhaven_status,
             "get_hyper3d_status": self.get_hyper3d_status,
@@ -474,21 +475,26 @@ class BlenderMCPServer:
             return {"error": str(e)}
 
     def execute_code(self, code):
-        """Execute arbitrary Blender Python code"""
-        # This is powerful but potentially dangerous - use with caution
-        try:
-            # Create a local namespace for execution
-            namespace = {"bpy": bpy}
+        """Execute arbitrary Blender Python code.
 
-            # Capture stdout during execution, and return it as result
-            capture_buffer = io.StringIO()
+        Returns a structured result rather than raising on a code error, so the
+        caller receives the captured stdout plus the exception type and full
+        traceback. That gives the model enough context to correct the code.
+        """
+        # This is powerful but potentially dangerous - use with caution
+        namespace = {"bpy": bpy}
+        capture_buffer = io.StringIO()
+        try:
             with redirect_stdout(capture_buffer):
                 exec(code, namespace)
-
-            captured_output = capture_buffer.getvalue()
-            return {"executed": True, "result": captured_output}
+            return {"executed": True, "result": capture_buffer.getvalue()}
         except Exception as e:
-            raise Exception(f"Code execution error: {str(e)}")
+            return {
+                "executed": False,
+                "result": capture_buffer.getvalue(),
+                "error": f"{type(e).__name__}: {e}",
+                "traceback": traceback.format_exc(),
+            }
 
     def _object_summary(self, obj):
         """Build a compact, structured summary of an object for confirmation.
@@ -622,6 +628,52 @@ class BlenderMCPServer:
         )
         bpy.context.view_layer.update()
         return self._object_summary(new_obj)
+
+    def batch_edit(self, operations=None):
+        """Apply a list of editing operations in one round trip.
+
+        Each operation is a dict with an "op" key (one of add_primitive,
+        modify_object, set_material, duplicate_object, delete_object) and the
+        remaining keys are that operation's parameters. Operations run in order;
+        a failure is recorded per item and does not stop the batch.
+        """
+        operations = operations or []
+        op_map = {
+            "add_primitive": self.add_primitive,
+            "modify_object": self.modify_object,
+            "set_material": self.set_object_material,
+            "duplicate_object": self.duplicate_object,
+            "delete_object": self.delete_object,
+        }
+
+        results = []
+        for index, operation in enumerate(operations):
+            op_type = operation.get("op")
+            params = {k: v for k, v in operation.items() if k != "op"}
+            handler = op_map.get(op_type)
+            if handler is None:
+                results.append({
+                    "index": index, "op": op_type, "ok": False,
+                    "error": f"unknown op: {op_type}. Must be one of: {', '.join(sorted(op_map))}",
+                })
+                continue
+            try:
+                results.append({
+                    "index": index, "op": op_type, "ok": True,
+                    "result": handler(**params),
+                })
+            except Exception as e:
+                results.append({
+                    "index": index, "op": op_type, "ok": False, "error": str(e),
+                })
+
+        applied = sum(1 for r in results if r["ok"])
+        return {
+            "total": len(operations),
+            "applied": applied,
+            "failed": len(operations) - applied,
+            "results": results,
+        }
 
     def get_polyhaven_categories(self, asset_type):
         """Get categories for a specific asset type from Polyhaven"""
