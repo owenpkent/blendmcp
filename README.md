@@ -31,7 +31,9 @@ Full details and other clients are in [Installation](#installation) below.
 
 ## Release notes
 
-### blendmcp 1.4.0 (first release of this fork)
+Full per-version history is in [CHANGELOG.md](CHANGELOG.md). The latest release is **1.4.2**.
+
+### What this fork adds
 - Structured editing tools: `add_primitive`, `modify_object`, `set_material`, `duplicate_object`, and `delete_object`. These are more reliable than generating raw Python and they return the affected object's bounding box and dimensions so the result is confirmed in one step.
 - `batch_edit` applies many editing operations in a single round trip, with per-operation results, for bulk changes.
 - `get_blender_status` reports the connection state and which integrations are enabled. Call it first if a tool reports a connection problem.
