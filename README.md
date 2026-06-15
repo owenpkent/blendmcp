@@ -43,10 +43,17 @@ Give feedback, get inspired, and build on top of the MCP: [Discord](https://disc
 - Run Blender MCP on a remote host
 - Telemetry for tools executed (completely anonymous)
 
-### Installating a new version (existing users)
+### Installing a new version (existing users)
 - For newcomers, you can go straight to Installation. For existing users, see the points below
-- Download the latest addon.py file and replace the older one, then add it to Blender
-- Delete the MCP server from Claude and add it back again, and you should be good to go!
+- The addon now ships inside the `blender-mcp` package, so the server and addon update together. If you installed the server as a uv tool, update both with:
+  ```bash
+  uv tool upgrade blender-mcp
+  blender-mcp install-addon
+  ```
+  Then restart Blender. `blender-mcp install-addon --list` shows detected Blender versions; `--all` installs into every one, and `--blender-version 4.2` targets one.
+- Prefer manual? Download the latest `src/blender_mcp/addon.py` and replace the older one in Blender.
+- If your MCP client caches the server, remove and re-add it (or restart the client) so it picks up the new version.
+- `get_blender_status` reports the server and addon versions and warns when the addon is out of date.
 
 
 ## Features
@@ -178,11 +185,27 @@ _Prerequisites_: Make sure you have [Visual Studio Code](https://code.visualstud
 
 ### Installing the Blender Addon
 
-1. Download the `addon.py` file from this repo
-1. Open Blender
-2. Go to Edit > Preferences > Add-ons
-3. Click "Install..." and select the `addon.py` file
-4. Enable the addon by checking the box next to "Interface: Blender MCP"
+The addon ships inside the `blender-mcp` package, so you can install it with one
+command instead of downloading a file. After installing the server as a uv tool:
+
+```bash
+uv tool install blender-mcp   # if you have not already
+blender-mcp install-addon
+```
+
+This copies the addon into your Blender add-ons folder (use `--list` to see
+detected Blender versions, `--all` for every version, or `--blender-version 4.2`
+for a specific one). Then open Blender, go to Edit > Preferences > Add-ons, and
+enable "Interface: Blender MCP". This keeps the addon on the same version as the
+server, which matters because newer tools require the matching addon.
+
+**Manual install (alternative):**
+
+1. Download `src/blender_mcp/addon.py` from this repo
+2. Open Blender
+3. Go to Edit > Preferences > Add-ons
+4. Click "Install..." and select the `addon.py` file
+5. Enable the addon by checking the box next to "Interface: Blender MCP"
 
 
 ## Usage

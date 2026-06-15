@@ -294,6 +294,39 @@ def get_blender_connection():
     return _blender_connection
 
 
+def _server_version() -> str:
+    """Return the installed blender-mcp package version, or 'unknown'."""
+    try:
+        from importlib.metadata import version
+        return version("blender-mcp")
+    except Exception:
+        return "unknown"
+
+
+def _addon_staleness(server_version: str, addon_version):
+    """Return an update hint if the addon is older than the server, else None.
+
+    addon_version is the list reported by the addon (e.g. [1, 4, 0]) or None when
+    the addon is too old to report it. A None or older version yields a hint.
+    """
+    update = (
+        "Update it with: uv tool upgrade blender-mcp && blender-mcp install-addon"
+    )
+    if addon_version is None:
+        return f"The Blender addon is out of date (it cannot report its version). {update}"
+    try:
+        server = tuple(int(p) for p in str(server_version).split("."))
+        addon = tuple(int(p) for p in addon_version)
+    except (ValueError, TypeError):
+        return None  # cannot compare (e.g. a source checkout with no version)
+    if addon < server:
+        return (
+            f"The Blender addon is v{'.'.join(map(str, addon))} but the server is "
+            f"v{'.'.join(map(str, server))}. {update}"
+        )
+    return None
+
+
 @mcp.tool()
 @telemetry_tool("get_blender_status")
 def get_blender_status(ctx: Context) -> str:
@@ -307,12 +340,24 @@ def get_blender_status(ctx: Context) -> str:
         "host": config.host,
         "port": config.port,
         "connected": False,
+        "server_version": _server_version(),
+        "addon_version": None,
         "integrations": {},
         "hint": None,
     }
     try:
         blender = get_blender_connection()
         status["connected"] = True
+
+        # Version handshake: an old addon will not know this command, which the
+        # send_command error path surfaces, so we treat that as "stale".
+        try:
+            version_result = blender.send_command("get_addon_version")
+            if isinstance(version_result, dict):
+                status["addon_version"] = version_result.get("version")
+        except Exception:
+            status["addon_version"] = None
+
         for key, command in (
             ("polyhaven", "get_polyhaven_status"),
             ("hyper3d", "get_hyper3d_status"),
@@ -329,6 +374,10 @@ def get_blender_status(ctx: Context) -> str:
                     status["integrations"][key] = "unknown"
             except Exception as integration_error:
                 status["integrations"][key] = f"error: {integration_error}"
+
+        status["hint"] = _addon_staleness(
+            status["server_version"], status["addon_version"]
+        )
     except Exception as e:
         status["error"] = str(e)
         status["hint"] = (
@@ -1564,7 +1613,16 @@ def asset_creation_strategy() -> str:
 # Main execution
 
 def main():
-    """Run the MCP server"""
+    """Run the MCP server, or dispatch a CLI subcommand.
+
+    With no arguments (how MCP clients launch it) this runs the server. The
+    'install-addon' subcommand installs/updates the bundled Blender addon.
+    """
+    import sys
+    argv = sys.argv[1:]
+    if argv and argv[0] == "install-addon":
+        from .install_addon import main as install_addon_main
+        sys.exit(install_addon_main(argv[1:]))
     mcp.run()
 
 if __name__ == "__main__":

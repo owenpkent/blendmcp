@@ -17,8 +17,8 @@ import sys
 import types
 from unittest.mock import MagicMock
 
-# Make the repo root importable so `import addon` resolves the addon at the
-# project root (pytest only puts the tests/ dir on sys.path by default).
+# Make the repo root importable (pytest only puts the tests/ dir on sys.path by
+# default). The addon now ships inside the package as ``blender_mcp.addon``.
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)

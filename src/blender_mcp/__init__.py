@@ -1,6 +1,11 @@
 """Blender integration through the Model Context Protocol."""
 
-__version__ = "0.1.0"
+from importlib.metadata import PackageNotFoundError, version as _pkg_version
+
+try:
+    __version__ = _pkg_version("blender-mcp")
+except PackageNotFoundError:  # running from a source tree without an install
+    __version__ = "unknown"
 
 # Expose key classes and functions for easier imports
 from .server import BlenderConnection, get_blender_connection

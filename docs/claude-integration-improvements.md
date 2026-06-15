@@ -195,3 +195,36 @@ structured error shape across *all* tools (the traceback work covers the
 arbitrary-code path), dropping the per-call PolyHaven ping in
 `get_blender_connection`, exposing the scene as an MCP resource, and undo
 checkpoints before `execute_blender_code`.
+
+## Easy install and update
+
+The server was already on PyPI (`uvx blender-mcp`), but the addon was not: it
+lived at the repo root, was installed by hand, and updated by re-downloading the
+file. Nothing tied its version to the server's, and in fact the addon
+(`bl_info` 1.2), the package (`pyproject` 1.4.0), and `__init__.__version__`
+(0.1.0) had all drifted apart. A stale addon silently breaks newer tools, since
+the structured handlers, `batch_edit`, and the traceback-returning `execute_code`
+all live in the addon.
+
+What changed:
+
+- **The addon ships inside the package.** `addon.py` moved to
+  `src/blender_mcp/addon.py`, so it is part of the wheel. One source of truth.
+- **`blender-mcp install-addon`** locates the Blender add-ons directory for the
+  OS and copies the bundled addon in (`--list`, `--all`, `--blender-version`,
+  `--uninstall`). It is a subcommand of the existing entry point, so the no-arg
+  invocation MCP clients use still launches the server. Update flow:
+  `uv tool upgrade blender-mcp && blender-mcp install-addon`.
+- **Versions are single-sourced.** `__init__.__version__` now reads the installed
+  package version, the addon `bl_info` is set to match `pyproject`, and a test
+  (`test_addon_version_matches_package`) fails if they drift again.
+- **Version handshake.** The addon answers `get_addon_version`, and
+  `get_blender_status` reports `server_version`, `addon_version`, and a `hint`
+  telling the user to run `install-addon` when the addon is older than the server
+  (or too old to report its version at all).
+
+Note on publishing: the `blender-mcp` name on PyPI belongs to the upstream
+author, so this "update via PyPI" flow assumes publishing rights to that name (an
+upstream contribution). A standalone fork would publish under a different package
+name and adjust `pyproject` accordingly. The directory installer and version
+handshake work the same either way.

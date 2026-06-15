@@ -23,7 +23,9 @@ from contextlib import redirect_stdout, suppress
 bl_info = {
     "name": "Blender MCP",
     "author": "BlenderMCP",
-    "version": (1, 2),
+    # Keep this in lockstep with the package version in pyproject.toml.
+    # tests/test_install_addon.py asserts they match.
+    "version": (1, 4, 0),
     "blender": (3, 0, 0),
     "location": "View3D > Sidebar > BlenderMCP",
     "description": "Connect Blender to Claude via MCP",
@@ -257,6 +259,7 @@ class BlenderMCPServer:
             "get_scene_info": self.get_scene_info,
             "get_object_info": self.get_object_info,
             "get_viewport_screenshot": self.get_viewport_screenshot,
+            "get_addon_version": self.get_addon_version,
             "execute_code": self.execute_code,
             "add_primitive": self.add_primitive,
             "modify_object": self.modify_object,
@@ -323,6 +326,10 @@ class BlenderMCPServer:
             return {"status": "error", "message": f"Unknown command type: {cmd_type}"}
 
 
+
+    def get_addon_version(self):
+        """Report the installed addon version so the server can detect staleness."""
+        return {"version": list(bl_info["version"])}
 
     def get_scene_info(self):
         """Get information about the current Blender scene"""

@@ -9,7 +9,7 @@ Blender.
 """
 import math
 
-import addon
+from blender_mcp import addon
 
 
 def test_addon_imports_outside_blender():

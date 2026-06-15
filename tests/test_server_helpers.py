@@ -18,6 +18,7 @@ import blender_mcp.server as server
 from blender_mcp.server import (
     BlenderConnection,
     BlenderMCPConfig,
+    _addon_staleness,
     _normalize_rgba,
     _process_bbox,
     _wait_for_stable_file,
@@ -201,3 +202,30 @@ def test_wait_for_stable_file_true_for_existing_file(tmp_path):
 def test_wait_for_stable_file_false_when_missing(tmp_path):
     missing = tmp_path / "nope.png"
     assert _wait_for_stable_file(str(missing), timeout=0.2) is False
+
+
+# --- addon staleness (version handshake) ---
+
+def test_addon_staleness_none_when_current():
+    assert _addon_staleness("1.4.0", [1, 4, 0]) is None
+
+
+def test_addon_staleness_none_when_addon_newer():
+    assert _addon_staleness("1.4.0", [1, 5, 0]) is None
+
+
+def test_addon_staleness_hint_when_older():
+    hint = _addon_staleness("1.4.0", [1, 2, 0])
+    assert hint is not None
+    assert "install-addon" in hint
+
+
+def test_addon_staleness_hint_when_version_unknown():
+    hint = _addon_staleness("1.4.0", None)
+    assert hint is not None
+    assert "install-addon" in hint
+
+
+def test_addon_staleness_uncomparable_returns_none():
+    # A source checkout reports an unparseable server version; do not warn.
+    assert _addon_staleness("unknown", [1, 4, 0]) is None
