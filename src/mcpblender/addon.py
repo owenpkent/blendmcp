@@ -14,7 +14,7 @@ import traceback
 import os
 import shutil
 import zipfile
-from bpy.props import IntProperty, BoolProperty
+from bpy.props import IntProperty
 import io
 from datetime import datetime
 import hashlib, hmac, base64

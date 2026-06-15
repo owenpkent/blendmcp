@@ -13,4 +13,4 @@ wheels/
 .DS_Store
 
 # Local config secrets
-src/blender_mcp/config.py
+src/mcpblender/config.py
