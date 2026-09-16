@@ -5,6 +5,24 @@ fork of [blender-mcp](https://github.com/ahujasid/blender-mcp); the entries belo
 cover the fork's own releases. Versions are published on
 [PyPI](https://pypi.org/project/blendmcp/).
 
+## 1.4.4
+
+Blender 5 support, and a fix for fresh installs.
+
+- Fixed `set_texture` on Blender 5.x. The add-on built its ARM (ambient
+  occlusion / roughness / metallic) channel split with `ShaderNodeSeparateRGB`,
+  which Blender removed in 5.0, so applying any Poly Haven texture that ships an
+  ARM map failed with "Node type ShaderNodeSeparateRGB undefined". It now uses
+  `ShaderNodeSeparateColor` and falls back to the old node on Blender 3.x/4.x.
+- Fixed the ambient-occlusion mix on Blender 5.x: the `MixRGB` factor socket was
+  renamed from `Fac` to `Factor`, so it is now addressed by index.
+- Constrained the `mcp` dependency to `<2`. mcp 2.0 renamed `FastMCP` to
+  `MCPServer`; the server targets the v1 API, so a fresh `uvx blendmcp` resolved
+  mcp 2.x and crashed on import with `No module named 'mcp.server.fastmcp'`.
+- Verified against Blender 4.5.9 LTS and 5.2.2: add-on registration, the scene
+  and object tools, primitives, materials, batch edits, viewport screenshots,
+  and the Poly Haven HDRI and texture pipelines.
+
 ## 1.4.3
 
 Security and dependency maintenance. No changes to tool behavior.

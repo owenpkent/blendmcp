@@ -1,6 +1,6 @@
 [project]
 name = "blendmcp"
-version = "1.4.3"
+version = "1.4.4"
 description = "Control Blender from Claude and other LLMs through the Model Context Protocol"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -14,7 +14,7 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "mcp[cli]>=1.3.0",
+    "mcp[cli]>=1.3.0,<2",
 ]
 
 [project.scripts]
