@@ -31,7 +31,7 @@ Full details and other clients are in [Installation](#installation) below.
 
 ## Release notes
 
-Full per-version history is in [CHANGELOG.md](CHANGELOG.md). The latest release is **1.4.3**.
+Full per-version history is in [CHANGELOG.md](CHANGELOG.md). The latest release is **1.4.4**.
 
 ### What this fork adds
 - Structured editing tools: `add_primitive`, `modify_object`, `set_material`, `duplicate_object`, and `delete_object`. These are more reliable than generating raw Python and they return the affected object's bounding box and dimensions so the result is confirmed in one step.
@@ -85,7 +85,7 @@ The system consists of two main components:
 
 ### Prerequisites
 
-- Blender 3.0 or newer
+- Blender 3.0 or newer (tested on 4.5 LTS and 5.2)
 - Python 3.10 or newer
 - uv package manager: 
 

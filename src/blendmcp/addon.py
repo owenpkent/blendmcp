@@ -26,7 +26,7 @@ bl_info = {
     "author": "Owen Kent",
     # Keep this in lockstep with the package version in pyproject.toml.
     # tests/test_install_addon.py asserts they match.
-    "version": (1, 4, 3),
+    "version": (1, 4, 4),
     "blender": (3, 0, 0),
     "location": "View3D > Sidebar > BlendMCP",
     "description": "Connect Blender to Claude via MCP",
@@ -93,6 +93,34 @@ def _normalization_scale(max_dimension, target_size):
     if max_dimension and max_dimension > 0:
         return target_size / max_dimension
     return 1.0
+
+
+# Shader node types whose name changed across Blender versions. Blender 3.3
+# added ShaderNodeSeparateColor and Blender 5.0 removed the older
+# ShaderNodeSeparateRGB, so creating the node by a single hardcoded name fails
+# on one end of the supported range or the other.
+_RGB_SPLIT_NODE_TYPES = ("ShaderNodeSeparateColor", "ShaderNodeSeparateRGB")
+
+
+def new_rgb_split_node(nodes):
+    """Create a node that splits a color into its R, G and B channels.
+
+    Tries the current node type first and falls back to the pre-5.0 one, so the
+    addon works on Blender 3.x through 5.x. Callers must address the sockets by
+    index, not name: the input is 'Color' on SeparateColor but 'Image' on
+    SeparateRGB, and the outputs are 'Red'/'Green'/'Blue' versus 'R'/'G'/'B'.
+
+    Raises RuntimeError when the Blender build offers neither type.
+    """
+    for node_type in _RGB_SPLIT_NODE_TYPES:
+        try:
+            return nodes.new(type=node_type)
+        except RuntimeError:
+            continue
+    raise RuntimeError(
+        "This Blender build has no RGB split node; tried: "
+        + ", ".join(_RGB_SPLIT_NODE_TYPES)
+    )
 
 
 class BlendMCPServer:
@@ -1245,18 +1273,20 @@ class BlendMCPServer:
 
             # Handle ARM texture (Ambient Occlusion, Roughness, Metallic)
             if 'arm' in texture_nodes:
-                separate_rgb = nodes.new(type='ShaderNodeSeparateRGB')
+                # Sockets are addressed by index because their names differ
+                # between SeparateColor and the pre-5.0 SeparateRGB node.
+                separate_rgb = new_rgb_split_node(nodes)
                 separate_rgb.location = (-200, -100)
-                links.new(texture_nodes['arm'].outputs['Color'], separate_rgb.inputs['Image'])
+                links.new(texture_nodes['arm'].outputs['Color'], separate_rgb.inputs[0])
 
                 # Connect Roughness (G) if no dedicated roughness map
                 if not any(map_name in texture_nodes for map_name in ['roughness', 'rough']):
-                    links.new(separate_rgb.outputs['G'], principled.inputs['Roughness'])
+                    links.new(separate_rgb.outputs[1], principled.inputs['Roughness'])
                     print("Connected ARM.G to Roughness")
 
                 # Connect Metallic (B) if no dedicated metallic map
                 if not any(map_name in texture_nodes for map_name in ['metallic', 'metalness', 'metal']):
-                    links.new(separate_rgb.outputs['B'], principled.inputs['Metallic'])
+                    links.new(separate_rgb.outputs[2], principled.inputs['Metallic'])
                     print("Connected ARM.B to Metallic")
 
                 # For AO (R channel), multiply with base color if we have one
@@ -1270,7 +1300,9 @@ class BlendMCPServer:
                     mix_node = nodes.new(type='ShaderNodeMixRGB')
                     mix_node.location = (100, 200)
                     mix_node.blend_type = 'MULTIPLY'
-                    mix_node.inputs['Fac'].default_value = 0.8  # 80% influence
+                    # Socket 0 is the mix factor: 'Fac' before Blender 5.0,
+                    # 'Factor' from 5.0 on.
+                    mix_node.inputs[0].default_value = 0.8  # 80% influence
 
                     # Disconnect direct connection to base color
                     for link in base_color_node.outputs['Color'].links:
@@ -1279,7 +1311,7 @@ class BlendMCPServer:
 
                     # Connect through the mix node
                     links.new(base_color_node.outputs['Color'], mix_node.inputs[1])
-                    links.new(separate_rgb.outputs['R'], mix_node.inputs[2])
+                    links.new(separate_rgb.outputs[0], mix_node.inputs[2])
                     links.new(mix_node.outputs['Color'], principled.inputs['Base Color'])
                     print("Connected ARM.R to AO mix with Base Color")
 
@@ -1295,7 +1327,9 @@ class BlendMCPServer:
                     mix_node = nodes.new(type='ShaderNodeMixRGB')
                     mix_node.location = (100, 200)
                     mix_node.blend_type = 'MULTIPLY'
-                    mix_node.inputs['Fac'].default_value = 0.8  # 80% influence
+                    # Socket 0 is the mix factor: 'Fac' before Blender 5.0,
+                    # 'Factor' from 5.0 on.
+                    mix_node.inputs[0].default_value = 0.8  # 80% influence
 
                     # Disconnect direct connection to base color
                     for link in base_color_node.outputs['Color'].links:
