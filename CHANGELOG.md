@@ -5,6 +5,37 @@ fork of [blender-mcp](https://github.com/ahujasid/blender-mcp); the entries belo
 cover the fork's own releases. Versions are published on
 [PyPI](https://pypi.org/project/blendmcp/).
 
+## 1.4.5
+
+Poly Haven textures now use every map they ship.
+
+- Fixed the map-name matching in `set_texture`. Map types are parsed from the
+  image filename, and Poly Haven capitalizes several of them (`Diffuse`, `AO`,
+  `Rough`, `Displacement`), while the wiring pass compared them against
+  lower-case names. Three maps were silently dropped on every Poly Haven
+  texture that ships an ARM map: ambient occlusion was never multiplied into
+  the base color, and a dedicated roughness or metallic map lost to the ARM
+  channel that is only used when no dedicated map exists. Map names are now
+  normalized when they are parsed.
+- Fixed the base-color map loading as `Non-Color` in
+  `download_polyhaven_asset`, the same case-sensitivity bug in the colorspace
+  assignment, which left the material built at download time washed out.
+- A dedicated AO map now takes precedence over the ARM red channel, matching
+  how dedicated roughness and metallic maps already behave. Applying a texture
+  that ships both no longer builds two multiply nodes where the second hides
+  the first.
+- `set_texture` no longer wires maps twice. Its first pass created the image
+  nodes and linked them, then the second pass linked them again, leaving a
+  duplicate Normal Map node and a duplicate Displacement node shadowing the
+  connected ones. The first pass now only creates nodes.
+- Added material-graph tests using Poly Haven's own capitalization and a
+  texture set with both ARM and dedicated AO maps. The existing cases all used
+  lower-case names, so they never exercised the paths that were broken. All 105
+  tests pass; CI passes on Python 3.10, 3.11, and 3.12.
+- Verified against Blender 5.2.2 LTS: applying `brick_wall_02` at 1k wires the
+  AO multiply into base color, the dedicated `Rough` map into Roughness, ARM
+  blue into Metallic, and one normal and one displacement node.
+
 ## 1.4.4
 
 [GitHub release](https://github.com/owenpkent/blendmcp/releases/tag/v1.4.4) ·
