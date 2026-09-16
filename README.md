@@ -31,7 +31,7 @@ Full details and other clients are in [Installation](#installation) below.
 
 ## Release notes
 
-The latest release is **[1.4.4](https://github.com/owenpkent/blendmcp/releases/tag/v1.4.4)**, available on [PyPI](https://pypi.org/project/blendmcp/1.4.4/).
+The latest release is **[1.4.5](https://github.com/owenpkent/blendmcp/releases/tag/v1.4.5)**, available on [PyPI](https://pypi.org/project/blendmcp/1.4.5/).
 
 - Poly Haven ARM textures and ambient-occlusion mixing now work on Blender 5.x.
 - Fresh installs use the supported MCP 1.x API, avoiding the `mcp.server.fastmcp` import error.
@@ -77,7 +77,7 @@ uvx blendmcp@latest install-addon
 
 The `@latest` suffix refreshes uv's cached tool version. If you have also installed BlendMCP with `uv tool install`, use the tool-upgrade commands above: plain `uvx blendmcp` prefers that installed version. See [uv's tool-version behavior](https://docs.astral.sh/uv/concepts/tools/#tool-versions).
 
-To pin the server to this release, set your MCP client's `uvx` arguments to `["blendmcp@1.4.4"]` and install the matching add-on with `uvx blendmcp@1.4.4 install-addon`.
+To pin the server to this release, set your MCP client's `uvx` arguments to `["blendmcp@1.4.5"]` and install the matching add-on with `uvx blendmcp@1.4.5 install-addon`.
 
 **Installed with pip:** run these in the Python environment used by your MCP client:
 
@@ -86,9 +86,9 @@ python -m pip install --upgrade blendmcp
 blendmcp install-addon
 ```
 
-The installer targets the newest detected Blender configuration by default. Add `--all` to update every detected version, `--blender-version 5.2` to target one, or `--list` to list the available versions. For a manual installation, use the [released add-on file](https://raw.githubusercontent.com/owenpkent/blendmcp/v1.4.4/src/blendmcp/addon.py).
+The installer targets the newest detected Blender configuration by default. Add `--all` to update every detected version, `--blender-version 5.2` to target one, or `--list` to list the available versions. For a manual installation, use the [released add-on file](https://raw.githubusercontent.com/owenpkent/blendmcp/v1.4.5/src/blendmcp/addon.py).
 
-Restart Blender and your MCP client, reconnect from the BlendMCP sidebar, then ask the client to run `get_blender_status`. For this release, `server_version` and `addon_version` should both report `1.4.4`.
+Restart Blender and your MCP client, reconnect from the BlendMCP sidebar, then ask the client to run `get_blender_status`. For this release, `server_version` and `addon_version` should both report `1.4.5`.
 
 
 ## Features
@@ -237,7 +237,7 @@ server, which matters because newer tools require the matching addon.
 
 **Manual install (alternative):**
 
-1. Save the [v1.4.4 add-on](https://raw.githubusercontent.com/owenpkent/blendmcp/v1.4.4/src/blendmcp/addon.py) as `addon.py` (use the release matching your server version)
+1. Save the [v1.4.5 add-on](https://raw.githubusercontent.com/owenpkent/blendmcp/v1.4.5/src/blendmcp/addon.py) as `addon.py` (use the release matching your server version)
 2. Open Blender
 3. Go to Edit > Preferences > Add-ons
 4. Choose "Install from Disk..." from the Add-ons menu ("Install..." in older Blender versions) and select `addon.py`; see the [Blender add-on installation guide](https://docs.blender.org/manual/en/latest/editors/preferences/addons.html)
@@ -348,7 +348,7 @@ routing, dedicated roughness/metallic maps, separate AO, and ARM without color.
 The MCP dependency test parses version constraints so an accidental `<20` bound
 cannot pass as `<2`.
 
-Release 1.4.4 has 99 passing tests, with CI running Python 3.10, 3.11, and 3.12.
+Release 1.4.5 has 105 passing tests, with CI running Python 3.10, 3.11, and 3.12.
 These fakes cover graph construction; Blender API compatibility and rendered
 appearance still require checks in Blender.
 

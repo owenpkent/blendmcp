@@ -26,7 +26,7 @@ bl_info = {
     "author": "Owen Kent",
     # Keep this in lockstep with the package version in pyproject.toml.
     # tests/test_install_addon.py asserts they match.
-    "version": (1, 4, 4),
+    "version": (1, 4, 5),
     "blender": (3, 0, 0),
     "location": "View3D > Sidebar > BlendMCP",
     "description": "Connect Blender to Claude via MCP",
@@ -892,8 +892,12 @@ class BlendMCPServer:
                                         # Pack the image into .blend file
                                         image.pack()
 
-                                        # Set color space based on map type
-                                        if map_type in ['color', 'diffuse', 'albedo']:
+                                        # Set color space based on map type.
+                                        # Poly Haven's file keys are capitalized
+                                        # ('Diffuse', 'AO', 'Rough'), so compare
+                                        # case-insensitively or the base color
+                                        # map is loaded as Non-Color.
+                                        if map_type.lower() in ['color', 'diffuse', 'albedo']:
                                             try:
                                                 image.colorspace_settings.name = 'sRGB'
                                             except:
@@ -1100,14 +1104,17 @@ class BlendMCPServer:
             texture_images = {}
             for img in bpy.data.images:
                 if img.name.startswith(texture_id + "_"):
-                    # Extract the map type from the image name
-                    map_type = img.name.split('_')[-1].split('.')[0]
+                    # Extract the map type from the image name. Poly Haven
+                    # capitalizes several suffixes ('Diffuse', 'AO', 'Rough',
+                    # 'Displacement'), so normalize here: every lookup below
+                    # keys off this dict with lower-case names.
+                    map_type = img.name.split('_')[-1].split('.')[0].lower()
 
                     # Force a reload of the image
                     img.reload()
 
                     # Ensure proper color space
-                    if map_type.lower() in ['color', 'diffuse', 'albedo']:
+                    if map_type in ['color', 'diffuse', 'albedo']:
                         try:
                             img.colorspace_settings.name = 'sRGB'
                         except:
@@ -1181,7 +1188,7 @@ class BlendMCPServer:
                 tex_node.image = image
 
                 # Set color space based on map type
-                if map_type.lower() in ['color', 'diffuse', 'albedo']:
+                if map_type in ['color', 'diffuse', 'albedo']:
                     try:
                         tex_node.image.colorspace_settings.name = 'sRGB'
                     except:
@@ -1194,26 +1201,10 @@ class BlendMCPServer:
 
                 links.new(mapping.outputs['Vector'], tex_node.inputs['Vector'])
 
-                # Connect to appropriate input on Principled BSDF
-                if map_type.lower() in ['color', 'diffuse', 'albedo']:
-                    links.new(tex_node.outputs['Color'], principled.inputs['Base Color'])
-                elif map_type.lower() in ['roughness', 'rough']:
-                    links.new(tex_node.outputs['Color'], principled.inputs['Roughness'])
-                elif map_type.lower() in ['metallic', 'metalness', 'metal']:
-                    links.new(tex_node.outputs['Color'], principled.inputs['Metallic'])
-                elif map_type.lower() in ['normal', 'nor', 'dx', 'gl']:
-                    # Add normal map node
-                    normal_map = nodes.new(type='ShaderNodeNormalMap')
-                    normal_map.location = (x_pos + 200, y_pos)
-                    links.new(tex_node.outputs['Color'], normal_map.inputs['Color'])
-                    links.new(normal_map.outputs['Normal'], principled.inputs['Normal'])
-                elif map_type.lower() in ['displacement', 'disp', 'height']:
-                    # Add displacement node
-                    disp_node = nodes.new(type='ShaderNodeDisplacement')
-                    disp_node.location = (x_pos + 200, y_pos - 200)
-                    disp_node.inputs['Scale'].default_value = 0.1  # Reduce displacement strength
-                    links.new(tex_node.outputs['Color'], disp_node.inputs['Height'])
-                    links.new(disp_node.outputs['Displacement'], output.inputs['Displacement'])
+                # This pass only creates the image nodes. The second pass below
+                # owns every link into the Principled BSDF, including the ARM
+                # split and the AO mix, so wiring here too would leave a second
+                # Normal Map / Displacement node shadowing the real one.
 
                 y_pos -= 250
 
@@ -1289,14 +1280,16 @@ class BlendMCPServer:
                     links.new(separate_rgb.outputs[2], principled.inputs['Metallic'])
                     print("Connected ARM.B to Metallic")
 
-                # For AO (R channel), multiply with base color if we have one
+                # For AO (R channel), multiply with base color if we have one.
+                # A dedicated AO map wins, the same way a dedicated roughness or
+                # metallic map does; the block below wires that one up.
                 base_color_node = None
                 for map_name in ['color', 'diffuse', 'albedo']:
                     if map_name in texture_nodes:
                         base_color_node = texture_nodes[map_name]
                         break
 
-                if base_color_node:
+                if base_color_node and 'ao' not in texture_nodes:
                     mix_node = nodes.new(type='ShaderNodeMixRGB')
                     mix_node.location = (100, 200)
                     mix_node.blend_type = 'MULTIPLY'

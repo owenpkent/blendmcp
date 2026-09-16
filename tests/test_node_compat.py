@@ -146,9 +146,16 @@ def assert_link(source, target):
     pytest.param(['color', 'arm', 'metallic'], id='dedicated-metallic'),
     pytest.param(['color', 'ao'], id='separate-ao'),
     pytest.param(['arm'], id='arm-without-color'),
+    pytest.param(['color', 'arm', 'ao'], id='arm-and-dedicated-ao'),
+    # The suffixes Poly Haven actually ships, capitalization included: the
+    # lookups below key off normalized names, so 'Rough' must still beat ARM.G
+    # and 'AO' must still reach the base-color mix.
+    pytest.param(['Diffuse', 'arm', 'AO', 'Rough'], id='polyhaven-casing'),
 ])
 def test_set_texture_material_graph(monkeypatch, node_api, maps):
     nodes, factor_name = node_api
+    keys = [map_name.lower() for map_name in maps]
+    color_key = next((k for k in keys if k in ('color', 'diffuse', 'albedo')), None)
     material = SimpleNamespace(
         name='stone_material_Cube', use_nodes=False,
         node_tree=SimpleNamespace(nodes=nodes, links=FakeLinks()),
@@ -175,18 +182,20 @@ def test_set_texture_material_graph(monkeypatch, node_api, maps):
     assert result.get('success') is True, result
     assert obj.data.materials == [material]
     assert material.use_nodes is True
-    assert set(result['maps']) == set(maps)
+    assert set(result['maps']) == set(keys)
     principled, = [n for n in nodes if n.bl_idname == 'ShaderNodeBsdfPrincipled']
     output, = [n for n in nodes if n.bl_idname == 'ShaderNodeOutputMaterial']
     assert_link(principled.outputs['BSDF'], output.inputs['Surface'])
     textures = {
-        n.image.name.removeprefix('stone_'): n
+        n.image.name.removeprefix('stone_').lower(): n
         for n in nodes if n.type == 'TEX_IMAGE'
     }
+    # The first pass creates image nodes only, so each map gets exactly one.
+    assert len(textures) == len(maps)
     splitters = [n for n in nodes if n.bl_idname in {
         'ShaderNodeSeparateColor', 'ShaderNodeSeparateRGB',
     }]
-    if 'arm' in maps:
+    if 'arm' in keys:
         splitter, = splitters
         if splitter.bl_idname == 'ShaderNodeSeparateColor':
             assert splitter.mode == 'RGB'
@@ -194,13 +203,20 @@ def test_set_texture_material_graph(monkeypatch, node_api, maps):
         else:
             input_name, channels = 'Image', ['R', 'G', 'B']
         assert_link(textures['arm'].outputs['Color'], splitter.inputs[input_name])
-        ao_source, roughness, metallic = [splitter.outputs[name] for name in channels]
-        for map_name, target, channel in [
-            ('roughness', 'Roughness', roughness),
-            ('metallic', 'Metallic', metallic),
+        arm_ao, roughness, metallic = [splitter.outputs[name] for name in channels]
+        for aliases, target, channel in [
+            (['roughness', 'rough'], 'Roughness', roughness),
+            (['metallic', 'metalness', 'metal'], 'Metallic', metallic),
         ]:
-            source = textures[map_name].outputs['Color'] if map_name in maps else channel
+            dedicated = next((k for k in aliases if k in keys), None)
+            source = textures[dedicated].outputs['Color'] if dedicated else channel
             assert_link(source, principled.inputs[target])
+        if 'ao' in keys:
+            # A dedicated AO map wins, so the ARM red channel stays unlinked.
+            ao_source = textures['ao'].outputs['Color']
+            assert arm_ao.links == []
+        else:
+            ao_source = arm_ao
     else:
         assert splitters == []
         assert principled.inputs['Roughness'].links == []
@@ -208,11 +224,11 @@ def test_set_texture_material_graph(monkeypatch, node_api, maps):
         ao_source = textures['ao'].outputs['Color']
 
     mixes = [n for n in nodes if n.bl_idname == 'ShaderNodeMixRGB']
-    if 'color' in maps:
+    if color_key:
         mix, = mixes
         assert mix.blend_type == 'MULTIPLY'
         assert mix.inputs[factor_name].default_value == pytest.approx(0.8)
-        assert_link(textures['color'].outputs['Color'], mix.inputs['Color1'])
+        assert_link(textures[color_key].outputs['Color'], mix.inputs['Color1'])
         assert_link(ao_source, mix.inputs['Color2'])
         assert_link(mix.outputs['Color'], principled.inputs['Base Color'])
     else:
