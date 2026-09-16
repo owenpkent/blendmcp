@@ -8,10 +8,10 @@ name: publish
 # "publish.yml", environment "pypi". See
 # https://docs.pypi.org/trusted-publishers/
 #
-# Caveat: this workflow only runs on release, so the upload-artifact and
-# download-artifact steps are NOT exercised by CI (tests.yml has no artifact
-# steps). Keep those two actions on matching major versions; a mismatch in the
-# artifact hand-off would first surface here, at release time, not in PR checks.
+# The release and manual triggers exercise the artifact and publishing steps;
+# tests.yml does not. The v1.4.4 release verified upload-artifact v7.0.1 with
+# download-artifact v8.0.1. Check artifact compatibility when upgrading either
+# action. See docs/releasing.md for the release and verification process.
 
 on:
   release:

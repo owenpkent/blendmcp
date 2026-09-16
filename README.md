@@ -20,20 +20,27 @@ This is a telemetry-free fork of [blender-mcp](https://github.com/ahujasid/blend
    ```json
    { "mcpServers": { "blendmcp": { "command": "uvx", "args": ["blendmcp"] } } }
    ```
-3. Install the Blender add-on, then connect:
+3. Open Blender once so its configuration folder exists, then install the add-on:
    ```bash
    uv tool install blendmcp
    blendmcp install-addon
    ```
-   In Blender's 3D View sidebar (press `N`), open the **BlendMCP** tab and click **Connect to Claude**.
+   Restart Blender, open **Edit > Preferences > Add-ons**, search for **BlendMCP**, and enable it. In the 3D View sidebar (press `N`), open the **BlendMCP** tab and click **Connect to Claude**.
 
 Full details and other clients are in [Installation](#installation) below.
 
 ## Release notes
 
-Full per-version history is in [CHANGELOG.md](CHANGELOG.md). The latest release is **1.4.4**.
+The latest release is **[1.4.4](https://github.com/owenpkent/blendmcp/releases/tag/v1.4.4)**, available on [PyPI](https://pypi.org/project/blendmcp/1.4.4/).
+
+- Poly Haven ARM textures and ambient-occlusion mixing now work on Blender 5.x.
+- Fresh installs use the supported MCP 1.x API, avoiding the `mcp.server.fastmcp` import error.
+- Material-graph regression tests cover Blender 3.x–5.x node APIs, ARM channels, dedicated-map precedence, and AO settings.
+
+Full per-version history is in [CHANGELOG.md](CHANGELOG.md).
 
 ### What this fork adds
+
 - Structured editing tools: `add_primitive`, `modify_object`, `set_material`, `duplicate_object`, and `delete_object`. These are more reliable than generating raw Python and they return the affected object's bounding box and dimensions so the result is confirmed in one step.
 - `batch_edit` applies many editing operations in a single round trip, with per-operation results, for bulk changes.
 - `get_blender_status` reports the connection state and which integrations are enabled. Call it first if a tool reports a connection problem.
@@ -41,9 +48,10 @@ Full per-version history is in [CHANGELOG.md](CHANGELOG.md). The latest release 
 - The connection reconnects and retries once after a dropped socket, so restarting Blender mid-session no longer breaks the next call.
 - The addon ships inside the package, so `blendmcp install-addon` keeps it on the same version as the server (a version handshake warns when it drifts).
 - Removed the telemetry/data-collection code entirely; this fork sends no usage data.
-- See `docs/claude-integration-improvements.md` for the rationale and the full list of changes.
+- See the [integration design notes](docs/claude-integration-improvements.md) for the rationale and the full list of changes.
 
 ### Inherited from the original blender-mcp
+
 - View screenshots of the Blender viewport to better understand the scene
 - Generate 3D models with Hunyuan3D and Hyper3D Rodin
 - Search and download Sketchfab models
@@ -51,16 +59,36 @@ Full per-version history is in [CHANGELOG.md](CHANGELOG.md). The latest release 
 - Run the MCP server on a remote host
 
 ### Installing a new version (existing users)
-- For newcomers, you can go straight to Installation. For existing users, see the points below
-- The addon now ships inside the `blendmcp` package, so the server and addon update together. If you installed the server as a uv tool, update both with:
-  ```bash
-  uv tool upgrade blendmcp
-  blendmcp install-addon
-  ```
-  Then restart Blender. `blendmcp install-addon --list` shows detected Blender versions; `--all` installs into every one, and `--blender-version 4.2` targets one.
-- Prefer manual? Download the latest `src/blendmcp/addon.py` and replace the older one in Blender.
-- If your MCP client caches the server, remove and re-add it (or restart the client) so it picks up the new version.
-- `get_blender_status` reports the server and addon versions and warns when the addon is out of date.
+
+Update the server and copy its bundled add-on into Blender using the commands for your installation method.
+
+**Installed with `uv tool install`:**
+
+```bash
+uv tool upgrade blendmcp
+blendmcp install-addon
+```
+
+**Using `uvx` without a persistent tool installation:**
+
+```bash
+uvx blendmcp@latest install-addon
+```
+
+The `@latest` suffix refreshes uv's cached tool version. If you have also installed BlendMCP with `uv tool install`, use the tool-upgrade commands above: plain `uvx blendmcp` prefers that installed version. See [uv's tool-version behavior](https://docs.astral.sh/uv/concepts/tools/#tool-versions).
+
+To pin the server to this release, set your MCP client's `uvx` arguments to `["blendmcp@1.4.4"]` and install the matching add-on with `uvx blendmcp@1.4.4 install-addon`.
+
+**Installed with pip:** run these in the Python environment used by your MCP client:
+
+```bash
+python -m pip install --upgrade blendmcp
+blendmcp install-addon
+```
+
+The installer targets the newest detected Blender configuration by default. Add `--all` to update every detected version, `--blender-version 5.2` to target one, or `--list` to list the available versions. For a manual installation, use the [released add-on file](https://raw.githubusercontent.com/owenpkent/blendmcp/v1.4.4/src/blendmcp/addon.py).
+
+Restart Blender and your MCP client, reconnect from the BlendMCP sidebar, then ask the client to run `get_blender_status`. For this release, `server_version` and `addon_version` should both report `1.4.4`.
 
 
 ## Features
@@ -85,7 +113,7 @@ The system consists of two main components:
 
 ### Prerequisites
 
-- Blender 3.0 or newer (tested on 4.5 LTS and 5.2)
+- Blender 3.0 or newer (live verification on 4.5.9 LTS and 5.2.2; the 3.0–3.2 shader-node fallback is covered by unit tests)
 - Python 3.10 or newer
 - uv package manager: 
 
@@ -201,17 +229,18 @@ blendmcp install-addon
 ```
 
 This copies the addon into your Blender add-ons folder (use `--list` to see
-detected Blender versions, `--all` for every version, or `--blender-version 4.2`
-for a specific one). Then open Blender, go to Edit > Preferences > Add-ons, and
+detected Blender versions, `--all` for every version, or `--blender-version 5.2`
+for a specific one). If no installation is detected, open Blender once to create
+its configuration folder and retry. Restart Blender, go to Edit > Preferences > Add-ons, and
 enable "Interface: BlendMCP". This keeps the addon on the same version as the
 server, which matters because newer tools require the matching addon.
 
 **Manual install (alternative):**
 
-1. Download `src/blendmcp/addon.py` from this repo
+1. Save the [v1.4.4 add-on](https://raw.githubusercontent.com/owenpkent/blendmcp/v1.4.4/src/blendmcp/addon.py) as `addon.py` (use the release matching your server version)
 2. Open Blender
 3. Go to Edit > Preferences > Add-ons
-4. Click "Install..." and select the `addon.py` file
+4. Choose "Install from Disk..." from the Add-ons menu ("Install..." in older Blender versions) and select `addon.py`; see the [Blender add-on installation guide](https://docs.blender.org/manual/en/latest/editors/preferences/addons.html)
 5. Enable the addon by checking the box next to "Interface: BlendMCP"
 
 
@@ -224,7 +253,7 @@ server, which matters because newer tools require the matching addon.
 2. Find the "BlendMCP" tab
 3. Turn on the Poly Haven checkbox if you want assets from their API (optional)
 4. Click "Connect to Claude"
-5. Make sure the MCP server is running in your terminal
+5. Open your configured MCP client; it launches the server automatically
 
 ### Using with Claude
 
@@ -265,6 +294,8 @@ Hyper3D's free trial key allows you to generate a limited number of models per d
 - **Start here**: ask Claude to run `get_blender_status`. It reports whether the server can reach Blender, which integrations are enabled, and whether the addon is out of date (with a fix).
 - **Connection issues**: Make sure the Blender addon server is running (you clicked "Connect to Claude" in the BlendMCP sidebar) and the MCP server is configured on Claude. Do not run the `uvx` command yourself in a terminal; the MCP client launches it. Sometimes the first command won't go through but it starts working after that.
 - **Addon out of date**: After upgrading the server, run `blendmcp install-addon` and restart Blender. Newer tools require the matching addon version.
+- **Blender 5.x texture errors**: `Node type ShaderNodeSeparateRGB undefined` or a missing `Fac` socket indicates an older add-on. Follow the [upgrade steps](#installing-a-new-version-existing-users), including reinstalling the bundled add-on, then restart Blender.
+- **`No module named 'mcp.server.fastmcp'`**: Upgrade BlendMCP to 1.4.4 or newer using the steps above and restart the MCP client. Version 1.4.4 constrains `mcp` to `>=1.3.0,<2`; an older cached BlendMCP installation may resolve an incompatible MCP version.
 - **Timeout errors**: Try simplifying your requests or breaking them into smaller steps.
 - **Poly Haven integration**: Claude is sometimes erratic with its behaviour.
 - **Still stuck?**: Restart both Claude and the Blender server.
@@ -295,8 +326,8 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 Tests live in `tests/` and run outside Blender. Because `addon.py` imports `bpy`
 (only available inside Blender), `tests/conftest.py` installs lightweight
-stand-ins for `bpy`, `mathutils`, and `requests` so the addon's pure helper
-functions can be imported and tested directly.
+stand-ins for `bpy`, `mathutils`, and `requests` so addon code can be imported
+and exercised without a Blender process.
 
 Install the dev dependencies and run the suite with [uv](https://docs.astral.sh/uv/):
 
@@ -310,7 +341,21 @@ the server helpers and tools (color normalization, environment config, the
 editing tools, `get_blender_status`); the connection logic (reconnect-once-and-retry,
 code-execution tracebacks, batch edits); and the addon installer (Blender-directory
 resolution, install/uninstall, and a guard that the addon version matches the
-package).
+package). `tests/test_node_compat.py` also exercises `set_texture` with strict
+fake node/socket APIs for Blender 3.0–3.2, 4.x, and 5.x. It checks the resulting
+material links for six texture combinations per API, including ARM channel
+routing, dedicated roughness/metallic maps, separate AO, and ARM without color.
+The MCP dependency test parses version constraints so an accidental `<20` bound
+cannot pass as `<2`.
+
+Release 1.4.4 has 99 passing tests, with CI running Python 3.10, 3.11, and 3.12.
+These fakes cover graph construction; Blender API compatibility and rendered
+appearance still require checks in Blender.
+
+### Releases
+
+Maintainers can follow [the release guide](docs/releasing.md) to prepare a version,
+publish its GitHub release, and verify the automatic PyPI upload.
 
 ## Credits and disclaimer
 
